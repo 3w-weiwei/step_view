@@ -48,6 +48,7 @@ const state = {
   projects: [],
   searchText: "",
   filterStatus: "all",
+  openProjectMenuId: null,
   route: { page: "home", projectId: null },
   loadingProjectId: null,
   activeProject: null,
@@ -222,16 +223,263 @@ function destroyViewer() {
   }
 }
 
-function render() {
+function captureBoundInputState() {
+  const activeElement = document.activeElement;
+  if (!activeElement?.dataset?.bind) {
+    return null;
+  }
+
+  if (
+    !(activeElement instanceof HTMLInputElement) &&
+    !(activeElement instanceof HTMLTextAreaElement) &&
+    !(activeElement instanceof HTMLSelectElement)
+  ) {
+    return null;
+  }
+
+  return {
+    bind: activeElement.dataset.bind,
+    value: activeElement.value,
+    selectionStart: "selectionStart" in activeElement ? activeElement.selectionStart : null,
+    selectionEnd: "selectionEnd" in activeElement ? activeElement.selectionEnd : null,
+  };
+}
+
+function restoreBoundInputState(snapshot) {
+  if (!snapshot?.bind) {
+    return;
+  }
+
+  const nextElement = root.querySelector(`[data-bind="${snapshot.bind}"]`);
+  if (!nextElement) {
+    return;
+  }
+
+  nextElement.focus({ preventScroll: true });
+  if ("value" in nextElement && nextElement.value !== snapshot.value) {
+    nextElement.value = snapshot.value;
+  }
+  if (
+    typeof nextElement.setSelectionRange === "function" &&
+    typeof snapshot.selectionStart === "number" &&
+    typeof snapshot.selectionEnd === "number"
+  ) {
+    nextElement.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd);
+  }
+}
+
+function render(options = {}) {
+  const boundInputState = options.preserveBoundInput ? captureBoundInputState() : null;
   const viewerSnapshot = state.route.page === "workbench" ? state.viewer?.snapshot() || null : null;
-  root.innerHTML = `${state.route.page === "workbench" ? renderWorkbenchPage() : renderHomePage()}${renderToasts()}`;
+  document.body.classList.toggle("workbench-mode", state.route.page === "workbench");
+  root.innerHTML = `${state.route.page === "workbench" ? renderWorkbenchPage() : renderHomePageWireframe()}${renderToasts()}`;
   if (state.route.page === "workbench") {
     mountViewer(viewerSnapshot);
   } else {
     destroyViewer();
   }
 
+  if (boundInputState) {
+    restoreBoundInputState(boundInputState);
+  }
+
   toggleDragMask(state.globalDragging);
+}
+
+function renderHomePageWireframe() {
+  const filteredProjects = getFilteredProjects();
+  const readyCount = state.projects.filter((project) => project.status === "ready").length;
+  const parsingCount = state.projects.filter((project) => project.status === "parsing").length;
+  const failedCount = state.projects.filter((project) => project.status === "failed").length;
+
+  return `
+    <main class="page home-page">
+      <section class="topbar glass-panel home-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark"></div>
+          <div class="brand-text">
+            <h1>STEP Workbench MVP</h1>
+            <p>首页聚焦 STEP 导入和项目卡片浏览，保持和线框图一致的结构节奏。</p>
+          </div>
+        </div>
+        <div class="home-actions">
+          <input
+            type="search"
+            placeholder="搜索项目 / 文件"
+            value="${escapeHtml(state.searchText)}"
+            data-bind="home-search"
+          />
+          <select data-bind="home-filter">
+            ${renderStatusOptionsWireframe(state.filterStatus)}
+          </select>
+          <button class="primary-button" data-action="pick-step">
+            <span>导入 STEP</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="upload-zone home-upload-zone ${state.globalDragging ? "is-dragging" : ""}" data-action="pick-step">
+        <div class="home-upload-copy">
+          <button class="secondary-button upload-zone-cta" data-action="pick-step">上传 STEP</button>
+          <h2>拖拽文件到此处，或点击按钮选择本地 STEP 模型</h2>
+          <p>支持 .step / .stp，导入后会自动创建项目卡片并进入解析流程。</p>
+        </div>
+      </section>
+
+      <section class="section-head home-section-head">
+        <div class="section-title">
+          <h3>项目卡片</h3>
+          <p data-role="home-result-copy">共 ${filteredProjects.length} 个结果，按最近更新时间排序。</p>
+        </div>
+        <div class="home-summary">
+          <span class="summary-pill">全部 ${state.projects.length}</span>
+          <span class="summary-pill">可打开 ${readyCount}</span>
+          <span class="summary-pill">解析中 ${parsingCount}</span>
+          <span class="summary-pill">异常 ${failedCount}</span>
+        </div>
+      </section>
+
+      <div data-role="home-results-slot">${renderHomeResultsSection(filteredProjects)}</div>
+    </main>
+  `;
+}
+
+function renderHomeResultsSection(filteredProjects = getFilteredProjects()) {
+  return filteredProjects.length
+    ? `<section class="project-grid project-grid-fixed">${filteredProjects.map((project) => renderProjectCardWireframe(project)).join("")}</section>`
+    : `
+      <section class="empty-state glass-panel">
+        <h3>还没有匹配的项目</h3>
+        <p>可以先导入一个 STEP 文件生成项目卡片，或者调整搜索词和筛选条件重新查看。</p>
+      </section>
+    `;
+}
+
+function renderStatusOptionsWireframe(selected) {
+  const options = [
+    { value: "all", label: "全部状态" },
+    { value: "ready", label: "可打开" },
+    { value: "parsing", label: "解析中" },
+    { value: "failed", label: "解析失败" },
+    { value: "pending", label: "待处理" },
+  ];
+
+  return options
+    .map(
+      (option) =>
+        `<option value="${option.value}" ${selected === option.value ? "selected" : ""}>${option.label}</option>`,
+    )
+    .join("");
+}
+
+function updateHomeResultsSection() {
+  const filteredProjects = getFilteredProjects();
+  const resultCopy = root.querySelector('[data-role="home-result-copy"]');
+  const resultSlot = root.querySelector('[data-role="home-results-slot"]');
+
+  if (state.openProjectMenuId && !filteredProjects.some((project) => project.projectId === state.openProjectMenuId)) {
+    state.openProjectMenuId = null;
+  }
+
+  if (resultCopy) {
+    resultCopy.textContent = `共 ${filteredProjects.length} 个结果，按最近更新时间排序。`;
+  }
+
+  if (resultSlot) {
+    resultSlot.innerHTML = renderHomeResultsSection(filteredProjects);
+  }
+}
+
+function renderProjectCardWireframe(project) {
+  const progress = normalizeProgress(project.progress);
+  const meta =
+    {
+      pending: { label: "待处理", className: "status-pending" },
+      parsing: { label: "解析中", className: "status-parsing" },
+      ready: { label: "可打开", className: "status-ready" },
+      failed: { label: "解析失败", className: "status-failed" },
+    }[project.status] || { label: "待处理", className: "status-pending" };
+  const clickable = project.status === "ready";
+  const menuOpen = state.openProjectMenuId === project.projectId;
+  const openAction = clickable ? `data-action="open-project" data-project-id="${project.projectId}"` : "";
+
+  return `
+    <article class="project-card project-card-fixed ${clickable ? "is-clickable" : ""}" data-project-id="${project.projectId}">
+      <div class="project-card-frame">
+        <div class="project-card-topline">
+          <div class="project-card-media">
+            <div class="thumbnail-frame project-thumbnail ${project.thumbnailDataUrl ? "" : "is-empty"}" ${openAction}>
+              ${project.thumbnailDataUrl ? `<img alt="${escapeHtml(project.projectName)}" src="${project.thumbnailDataUrl}" />` : ""}
+            </div>
+          </div>
+          <div class="project-card-main">
+            <div class="project-meta ${clickable ? "project-meta-link" : ""}" ${openAction}>
+              <h4>${escapeHtml(project.projectName)}</h4>
+              <p>${escapeHtml(project.sourceFileName)}</p>
+            </div>
+            <span class="status-pill project-status-pill ${meta.className}">${meta.label}${project.status === "parsing" ? ` ${progress}%` : ""}</span>
+          </div>
+          <div class="project-menu" data-role="project-menu">
+            <button
+              class="project-menu-button ${menuOpen ? "is-open" : ""}"
+              type="button"
+              data-action="toggle-project-menu"
+              data-project-id="${project.projectId}"
+              aria-expanded="${menuOpen ? "true" : "false"}"
+              aria-label="更多操作"
+            >
+              ...
+            </button>
+            ${
+              menuOpen
+                ? `
+                  <div class="project-menu-panel glass-panel" data-role="project-menu">
+                    ${
+                      clickable
+                        ? `<button class="project-menu-item" type="button" data-action="open-project" data-project-id="${project.projectId}">打开工作台</button>`
+                        : ""
+                    }
+                    ${
+                      project.status === "failed"
+                        ? `<button class="project-menu-item" type="button" data-action="retry-project" data-project-id="${project.projectId}">重新解析</button>`
+                        : ""
+                    }
+                    <button class="project-menu-item" type="button" data-action="rename-project" data-project-id="${project.projectId}">重命名</button>
+                    <button class="project-menu-item" type="button" data-action="open-source-dir" data-project-id="${project.projectId}">打开源目录</button>
+                    <button class="project-menu-item is-danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">删除项目</button>
+                  </div>
+                `
+                : ""
+            }
+          </div>
+        </div>
+        <div class="project-card-bottom">
+          <div class="project-facts-grid">
+            <span>装配数: <strong>${project.assemblyCount || "-"}</strong></span>
+            <span>零件数: <strong>${project.partCount || "-"}</strong></span>
+            <span>大小: <strong>${formatBytes(project.sourceFileSize)}</strong></span>
+          </div>
+          ${
+            project.status === "parsing"
+              ? `
+                <div class="progress-block project-feedback">
+                  <div class="progress-copy">
+                    <span>${escapeHtml(project.currentStage || "解析中")}</span>
+                    <strong>${progress}%</strong>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-value" style="width: ${progress}%"></div>
+                  </div>
+                </div>
+              `
+              : project.status === "failed"
+                ? `<div class="error-box project-feedback">${escapeHtml(project.errorSummary || "解析失败，请重试。")}</div>`
+                : `<div class="project-updated-time">更新时间: ${formatDateTime(project.updatedAt)}</div>`
+          }
+        </div>
+      </div>
+    </article>
+  `;
 }
 
 function renderHomePage() {
@@ -947,14 +1195,27 @@ function updateViewerHint(message) {
 }
 
 async function handleClick(event) {
+  const clickedInsideProjectMenu = event.target.closest('[data-role="project-menu"]');
   const actionTarget = event.target.closest("[data-action]");
   if (!actionTarget) {
+    if (state.openProjectMenuId && !clickedInsideProjectMenu) {
+      state.openProjectMenuId = null;
+      render();
+    }
     return;
   }
 
   const { action, projectId, nodeId, panel, preset, axis, mode } = actionTarget.dataset;
 
+  if (action !== "toggle-project-menu" && state.openProjectMenuId) {
+    state.openProjectMenuId = null;
+  }
+
   switch (action) {
+    case "toggle-project-menu":
+      state.openProjectMenuId = state.openProjectMenuId === projectId ? null : projectId;
+      render();
+      return;
     case "pick-step":
       await handlePickStep();
       return;
@@ -1060,13 +1321,14 @@ function handleInput(event) {
 
   if (bind === "home-search") {
     state.searchText = target.value;
-    render();
+    state.openProjectMenuId = null;
+    updateHomeResultsSection();
     return;
   }
 
   if (bind === "tree-search") {
     state.workbench.treeSearch = target.value;
-    render();
+    render({ preserveBoundInput: true });
     return;
   }
 
@@ -1089,7 +1351,8 @@ function handleChange(event) {
 
   if (bind === "home-filter") {
     state.filterStatus = target.value;
-    render();
+    state.openProjectMenuId = null;
+    updateHomeResultsSection();
   }
 }
 
@@ -1587,17 +1850,20 @@ function pushToast(message, tone = "info") {
 async function handleProjectUpdate(payload) {
   if (payload?.deleted) {
     state.projects = state.projects.filter((project) => project.projectId !== payload.projectId);
+    if (state.openProjectMenuId === payload.projectId) {
+      state.openProjectMenuId = null;
+    }
     if (state.activeProject?.manifest.projectId === payload.projectId) {
       setRoute({ page: "home" });
       return;
     }
-    render();
+    render({ preserveBoundInput: state.route.page === "home" });
     return;
   }
 
   if (!payload?.projectId) {
     state.projects = await api.listProjects();
-    render();
+    render({ preserveBoundInput: state.route.page === "home" });
     return;
   }
 
@@ -1612,7 +1878,8 @@ async function handleProjectUpdate(payload) {
     nextProjects.unshift(payload);
   }
 
-  state.projects = nextProjects.sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+  // Preserve the current visual order during live parsing updates so cards do not jump around.
+  state.projects = nextProjects;
 
   if (state.activeProject?.manifest.projectId === payload.projectId) {
     const nextDetails = await api.getProjectDetails(payload.projectId);
@@ -1622,7 +1889,16 @@ async function handleProjectUpdate(payload) {
     }
   }
 
-  render();
+  render({ preserveBoundInput: state.route.page === "home" });
+}
+
+function normalizeProgress(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(numericValue)));
 }
 
 function toggleDragMask(show) {
