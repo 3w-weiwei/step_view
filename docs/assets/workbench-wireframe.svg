@@ -1,0 +1,90 @@
+<svg width="1440" height="920" viewBox="0 0 1440 920" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="920" fill="#F5F7FA"/>
+
+  <rect x="0" y="0" width="1440" height="72" fill="white" stroke="#CAD3DD" stroke-width="2"/>
+  <rect x="28" y="20" width="96" height="32" rx="8" fill="#EEF4FF"/>
+  <text x="49" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#344054">返回首页</text>
+  <text x="156" y="42" font-family="Microsoft YaHei, Arial, sans-serif" font-size="22" fill="#101828">减速机总成</text>
+
+  <rect x="460" y="18" width="74" height="36" rx="10" fill="#F2F4F7"/>
+  <text x="478" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">适配</text>
+  <rect x="546" y="18" width="74" height="36" rx="10" fill="#F2F4F7"/>
+  <text x="566" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">前视</text>
+  <rect x="632" y="18" width="74" height="36" rx="10" fill="#F2F4F7"/>
+  <text x="652" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">左视</text>
+  <rect x="718" y="18" width="74" height="36" rx="10" fill="#F2F4F7"/>
+  <text x="738" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">顶视</text>
+  <rect x="816" y="18" width="92" height="36" rx="10" fill="#DDEBFF"/>
+  <text x="840" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">选择模式</text>
+  <rect x="920" y="18" width="74" height="36" rx="10" fill="#F2F4F7"/>
+  <text x="940" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">隔离</text>
+  <rect x="1006" y="18" width="74" height="36" rx="10" fill="#F2F4F7"/>
+  <text x="1026" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">测量</text>
+  <rect x="1092" y="18" width="74" height="36" rx="10" fill="#F2F4F7"/>
+  <text x="1112" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">剖切</text>
+  <rect x="1178" y="18" width="74" height="36" rx="10" fill="#F2F4F7"/>
+  <text x="1198" y="41" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">截图</text>
+
+  <rect x="0" y="72" width="72" height="800" fill="white" stroke="#CAD3DD" stroke-width="2"/>
+  <rect x="16" y="98" width="40" height="40" rx="10" fill="#DDEBFF"/>
+  <text x="26" y="124" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#344054">概览</text>
+  <rect x="16" y="154" width="40" height="40" rx="10" fill="#F2F4F7"/>
+  <text x="26" y="180" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#344054">树</text>
+  <rect x="16" y="210" width="40" height="40" rx="10" fill="#F2F4F7"/>
+  <text x="26" y="236" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#344054">显</text>
+  <rect x="16" y="266" width="40" height="40" rx="10" fill="#F2F4F7"/>
+  <text x="26" y="292" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#344054">剖</text>
+  <rect x="16" y="322" width="40" height="40" rx="10" fill="#F2F4F7"/>
+  <text x="26" y="348" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#344054">量</text>
+  <rect x="16" y="378" width="40" height="40" rx="10" fill="#F2F4F7"/>
+  <text x="26" y="404" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#344054">属</text>
+
+  <rect x="72" y="72" width="320" height="800" fill="white" stroke="#CAD3DD" stroke-width="2"/>
+  <text x="96" y="112" font-family="Microsoft YaHei, Arial, sans-serif" font-size="22" fill="#101828">项目概览</text>
+  <rect x="96" y="130" width="272" height="110" rx="14" fill="#F8FAFC" stroke="#D0D5DD"/>
+  <text x="116" y="160" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#344054">项目名称：减速机总成</text>
+  <text x="116" y="190" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#344054">文件名：gearbox.step</text>
+  <text x="116" y="220" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#344054">装配数：12   零件数：128</text>
+
+  <text x="96" y="286" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" fill="#101828">装配树</text>
+  <rect x="96" y="304" width="272" height="40" rx="10" fill="#F2F4F7"/>
+  <text x="116" y="329" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#667085">搜索零件 / 节点</text>
+
+  <rect x="96" y="360" width="272" height="430" rx="14" fill="#F8FAFC" stroke="#D0D5DD"/>
+  <text x="116" y="392" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#101828">▾ 总装配</text>
+  <text x="136" y="426" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">▾ 箱体组件</text>
+  <text x="156" y="458" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">• 左壳体</text>
+  <text x="156" y="490" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">• 右壳体</text>
+  <rect x="132" y="506" width="196" height="30" rx="8" fill="#DDEBFF"/>
+  <text x="156" y="526" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">• 主动齿轮轴</text>
+  <text x="136" y="568" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">▸ 轴承组件</text>
+  <text x="136" y="600" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">▸ 紧固件组</text>
+
+  <text x="96" y="828" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#667085">左侧建议支持折叠、搜索、选中联动</text>
+
+  <rect x="392" y="72" width="1048" height="800" fill="white" stroke="#CAD3DD" stroke-width="2"/>
+  <rect x="422" y="102" width="988" height="680" rx="18" fill="#F8FAFC" stroke="#D0D5DD" stroke-width="2"/>
+
+  <path d="M690 560 L820 430 L930 520 L1040 360 L1170 570" stroke="#98A2B3" stroke-width="4" fill="none"/>
+  <ellipse cx="780" cy="520" rx="90" ry="58" fill="#E4E7EC" stroke="#98A2B3" stroke-width="2"/>
+  <ellipse cx="925" cy="462" rx="88" ry="52" fill="#D0D5DD" stroke="#98A2B3" stroke-width="2"/>
+  <ellipse cx="1060" cy="548" rx="110" ry="62" fill="#E4E7EC" stroke="#98A2B3" stroke-width="2"/>
+  <rect x="905" y="430" width="92" height="68" rx="10" fill="#DDEBFF" stroke="#2E90FA" stroke-width="3"/>
+
+  <rect x="454" y="134" width="126" height="34" rx="10" fill="#EEF4FF"/>
+  <text x="479" y="156" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">3D 主视图区</text>
+
+  <rect x="454" y="716" width="232" height="40" rx="12" fill="white" stroke="#D0D5DD"/>
+  <text x="478" y="741" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">当前选中：主动齿轮轴 / 零件级</text>
+
+  <rect x="422" y="800" width="988" height="48" rx="12" fill="#F8FAFC" stroke="#D0D5DD"/>
+  <text x="452" y="830" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">状态栏：项目名 / 选中对象 / 选择类型 / 面数摘要 / 操作提示</text>
+
+  <rect x="1182" y="122" width="198" height="134" rx="14" fill="white" stroke="#D0D5DD"/>
+  <text x="1206" y="150" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#101828">快捷操作</text>
+  <text x="1206" y="182" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#475467">- 显示全部</text>
+  <text x="1206" y="206" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#475467">- 隔离选中</text>
+  <text x="1206" y="230" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#475467">- 测量距离</text>
+
+  <text x="1138" y="896" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#667085">工作台原型示意：左侧导航 + 右侧模型主视图</text>
+</svg>

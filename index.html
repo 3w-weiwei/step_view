@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>STEP Workbench MVP</title>
+    <link rel="stylesheet" href="./ui.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./node_modules/three/build/three.module.js",
+          "three/addons/": "./node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="ambient ambient-one"></div>
+      <div class="ambient ambient-two"></div>
+      <div id="app"></div>
+      <div id="drag-mask" class="drag-mask hidden">
+        <div class="drag-mask-card">
+          <span>STEP 导入</span>
+          <strong>松开鼠标即可创建新项目</strong>
+          <p>支持 .step / .stp，系统会自动进入解析流程。</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

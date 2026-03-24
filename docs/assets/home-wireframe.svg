@@ -1,0 +1,74 @@
+<svg width="1440" height="920" viewBox="0 0 1440 920" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="920" fill="#F5F7FA"/>
+  <rect x="32" y="24" width="1376" height="72" rx="16" fill="white" stroke="#CAD3DD" stroke-width="2"/>
+  <rect x="56" y="44" width="180" height="32" rx="8" fill="#E9EEF5"/>
+  <text x="72" y="65" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" fill="#344054">STEP CAD Viewer</text>
+  <rect x="950" y="42" width="210" height="36" rx="10" fill="#EEF4FF" stroke="#98A2B3"/>
+  <text x="1012" y="65" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#344054">搜索项目 / 文件</text>
+  <rect x="1178" y="42" width="98" height="36" rx="10" fill="#DDEBFF" stroke="#667085"/>
+  <text x="1202" y="65" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#344054">筛选</text>
+  <rect x="1292" y="42" width="92" height="36" rx="10" fill="#2E90FA"/>
+  <text x="1311" y="65" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="white">导入 STEP</text>
+
+  <rect x="32" y="120" width="1376" height="220" rx="20" fill="white" stroke="#CAD3DD" stroke-width="2" stroke-dasharray="10 8"/>
+  <rect x="634" y="168" width="172" height="48" rx="12" fill="#EEF4FF" stroke="#98A2B3"/>
+  <text x="681" y="198" font-family="Microsoft YaHei, Arial, sans-serif" font-size="22" fill="#344054">上传 STEP</text>
+  <text x="532" y="242" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" fill="#475467">拖拽文件到此处，或点击按钮选择本地 STEP 模型</text>
+  <text x="572" y="280" font-family="Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#667085">支持 .step / .stp，建议上传装配模型</text>
+
+  <text x="42" y="390" font-family="Microsoft YaHei, Arial, sans-serif" font-size="24" fill="#344054">项目卡片</text>
+
+  <rect x="32" y="414" width="430" height="220" rx="18" fill="white" stroke="#CAD3DD" stroke-width="2"/>
+  <rect x="56" y="438" width="132" height="96" rx="12" fill="#E9EEF5" stroke="#98A2B3"/>
+  <text x="92" y="492" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" fill="#475467">缩略图</text>
+  <rect x="392" y="440" width="44" height="28" rx="8" fill="#F2F4F7"/>
+  <text x="403" y="459" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#344054">...</text>
+  <text x="206" y="462" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" fill="#101828">减速机总成</text>
+  <text x="206" y="492" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#667085">gearbox.step</text>
+  <rect x="206" y="516" width="88" height="28" rx="8" fill="#ECFDF3"/>
+  <text x="224" y="535" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#027A48">可打开</text>
+  <text x="56" y="572" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#475467">装配数：12</text>
+  <text x="180" y="572" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#475467">零件数：128</text>
+  <text x="314" y="572" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#475467">大小：24.6 MB</text>
+  <text x="56" y="606" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#667085">更新时间：2026-03-24 10:30</text>
+
+  <rect x="505" y="414" width="430" height="220" rx="18" fill="white" stroke="#CAD3DD" stroke-width="2"/>
+  <rect x="529" y="438" width="132" height="96" rx="12" fill="#E9EEF5" stroke="#98A2B3"/>
+  <text x="565" y="492" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" fill="#475467">缩略图</text>
+  <rect x="865" y="440" width="44" height="28" rx="8" fill="#F2F4F7"/>
+  <text x="876" y="459" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#344054">...</text>
+  <text x="679" y="462" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" fill="#101828">机械臂总装</text>
+  <text x="679" y="492" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#667085">robot_arm.step</text>
+  <rect x="679" y="516" width="112" height="28" rx="8" fill="#FFF4E5"/>
+  <text x="703" y="535" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#B54708">解析中 63%</text>
+  <text x="529" y="572" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#475467">装配数：-</text>
+  <text x="653" y="572" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#475467">零件数：-</text>
+  <text x="787" y="572" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#475467">大小：51.2 MB</text>
+  <rect x="529" y="590" width="356" height="10" rx="5" fill="#EAECF0"/>
+  <rect x="529" y="590" width="224" height="10" rx="5" fill="#2E90FA"/>
+  <text x="529" y="620" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#667085">阶段：读取装配结构 / 网格化处理中</text>
+
+  <rect x="978" y="414" width="430" height="220" rx="18" fill="white" stroke="#CAD3DD" stroke-width="2"/>
+  <rect x="1002" y="438" width="132" height="96" rx="12" fill="#E9EEF5" stroke="#98A2B3"/>
+  <text x="1038" y="492" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" fill="#475467">缩略图</text>
+  <rect x="1338" y="440" width="44" height="28" rx="8" fill="#F2F4F7"/>
+  <text x="1349" y="459" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#344054">...</text>
+  <text x="1152" y="462" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" fill="#101828">泵体组件</text>
+  <text x="1152" y="492" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#667085">pump_assembly.step</text>
+  <rect x="1152" y="516" width="96" height="28" rx="8" fill="#FEF3F2"/>
+  <text x="1178" y="535" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#B42318">解析失败</text>
+  <text x="1002" y="572" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#475467">错误：部分实体读取失败</text>
+  <rect x="1002" y="590" width="116" height="32" rx="10" fill="#F2F4F7"/>
+  <text x="1030" y="611" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#344054">重新解析</text>
+
+  <rect x="32" y="662" width="430" height="220" rx="18" fill="white" stroke="#E4E7EC" stroke-width="2"/>
+  <rect x="56" y="686" width="132" height="96" rx="12" fill="#F2F4F7"/>
+  <text x="96" y="740" font-family="Microsoft YaHei, Arial, sans-serif" font-size="18" fill="#98A2B3">缩略图</text>
+  <text x="206" y="710" font-family="Microsoft YaHei, Arial, sans-serif" font-size="20" fill="#101828">新导入项目</text>
+  <text x="206" y="742" font-family="Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#667085">待导入后自动生成</text>
+  <rect x="206" y="766" width="88" height="28" rx="8" fill="#F2F4F7"/>
+  <text x="226" y="785" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#667085">待处理</text>
+
+  <text x="1126" y="884" font-family="Microsoft YaHei, Arial, sans-serif" font-size="14" fill="#667085">首页原型示意：上传区 + 项目卡片列表</text>
+</svg>
+

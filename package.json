@@ -1,0 +1,17 @@
+{
+  "name": "step-workbench-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "STEP 装配模型可视化桌面软件首版 MVP",
+  "main": "main.js",
+  "scripts": {
+    "start": "set ELECTRON_RUN_AS_NODE=&& electron ."
+  },
+  "devDependencies": {
+    "electron": "30"
+  },
+  "dependencies": {
+    "occt-import-js": "^0.0.23",
+    "three": "^0.183.2"
+  }
+}
