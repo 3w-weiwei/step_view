@@ -1,4 +1,4 @@
-import { WorkbenchViewer } from "./mesh-viewer.js";
+﻿import { WorkbenchViewer } from "./mesh-viewer.js";
 
 const api = window.cadViewerApi;
 const root = document.getElementById("app");
@@ -13,36 +13,113 @@ const STATUS_META = {
 
 const PANEL_META = {
   overview: {
-    icon: "概",
+    icon: "OV",
     title: "项目概览",
     description: "从项目级信息切入，确认模型来源、统计摘要和缓存状态。",
   },
   assembly: {
-    icon: "树",
+    icon: "AS",
     title: "装配树",
     description: "搜索零件、展开层级，并与 3D 主视图区保持联动高亮。",
   },
   display: {
-    icon: "显",
+    icon: "DP",
     title: "显示控制",
     description: "控制对象显隐与隔离范围，便于聚焦复杂装配中的局部区域。",
   },
   section: {
-    icon: "剖",
+    icon: "SC",
     title: "剖切分析",
-    description: "使用单平面剖切观察内部结构，首版支持按轴向调整位置。",
+    description: "使用单平面剖切观察内部结构，按轴向调整位置。",
   },
   measure: {
-    icon: "量",
+    icon: "MS",
     title: "测量工具",
     description: "在零件级与面级之间切换，完成距离、角度与边长的基础测量。",
   },
   properties: {
-    icon: "属",
+    icon: "PR",
     title: "属性信息",
-    description: "查看当前选中对象的名称、路径、材料、尺寸与面信息摘要。",
+    description: "查看当前选中对象的名称、路径、材质、尺寸与面信息摘要。",
   },
 };
+const REASONING_PANEL_META = {
+  summary: {
+    icon: "AI",
+    title: "装配推理",
+    description: "查看整体推理结果、当前焦点和分析刷新状态。",
+  },
+  constraints: {
+    icon: "CT",
+    title: "约束发现",
+    description: "查看基准件候选、配合候选和插入方向。",
+  },
+  transform: {
+    icon: "TF",
+    title: "姿态校验",
+    description: "查看相对位姿、插入方向和干涉校验结果。",
+  },
+  plan: {
+    icon: "PL",
+    title: "装配计划",
+    description: "查看候选装配序列与 precedence 关系。",
+  },
+  steps: {
+    icon: "ST",
+    title: "步骤讲解",
+    description: "查看单步解释、证据和 before/after 预览。",
+  },
+};
+
+function createEmptyReasoningOverlay() {
+  return {
+    focusPartIds: [],
+    basePartId: null,
+    assemblingPartId: null,
+    baseFaceIds: [],
+    assemblingFaceIds: [],
+    insertionAxis: null,
+    interferenceBoxes: [],
+  };
+}
+
+function createReasoningDataState(previousData = null) {
+  return {
+    summary: previousData?.summary || null,
+    basePartCandidates: previousData?.basePartCandidates || [],
+    matingCandidates: previousData?.matingCandidates || [],
+    insertionCandidates: previousData?.insertionCandidates || [],
+    selectedPair: previousData?.selectedPair || null,
+    relativeTransform: previousData?.relativeTransform || null,
+    interference: previousData?.interference || null,
+    plan: previousData?.plan || null,
+    stepExplanation: previousData?.stepExplanation || null,
+    stepPreview: previousData?.stepPreview || null,
+    stepPreviewError: previousData?.stepPreviewError || "",
+    constraintsOverlay: previousData?.constraintsOverlay || createEmptyReasoningOverlay(),
+    transformOverlay: previousData?.transformOverlay || createEmptyReasoningOverlay(),
+    stepOverlay: previousData?.stepOverlay || createEmptyReasoningOverlay(),
+  };
+}
+
+function createEmptyReasoningState(previousReasoning = null) {
+  const previous = previousReasoning || null;
+  return {
+    status: previous?.status || "idle",
+    error: previous?.error || "",
+    refreshedAt: previous?.refreshedAt || "",
+    data: createReasoningDataState(previous?.data),
+    selection: {
+      basePartId: previous?.selection?.basePartId || null,
+      assemblingPartId: previous?.selection?.assemblingPartId || null,
+      sequenceId: previous?.selection?.sequenceId || null,
+      stepIndex: previous?.selection?.stepIndex || null,
+      highlightedBaseFaceId: previous?.selection?.highlightedBaseFaceId || null,
+      highlightedAssemblingFaceId: previous?.selection?.highlightedAssemblingFaceId || null,
+    },
+    overlay: previous?.overlay ? { ...createEmptyReasoningOverlay(), ...previous.overlay } : createEmptyReasoningOverlay(),
+  };
+}
 
 const state = {
   projects: [],
@@ -54,16 +131,15 @@ const state = {
   activeProject: null,
   workbench: null,
   viewer: null,
+  mcpServerStatus: null,
   toasts: [],
   globalDragging: false,
-};
-
-if (!api) {
+};if (!api) {
   root.innerHTML = `
     <div class="loading-state">
       <div class="loading-card glass-panel">
         <h2>请通过 Electron 启动这个项目</h2>
-        <p>当前页面依赖 preload 暴露的桌面能力，包括文件选择、本地缓存目录读写和截图导出。</p>
+        <p>当前页面依赖 preload 暴露的桌面能力，包括文件选择、本地缓存读写和截图导出。</p>
       </div>
     </div>
   `;
@@ -79,11 +155,12 @@ if (!api) {
     `;
   });
 }
-
 async function bootstrap() {
   state.projects = await api.listProjects();
   state.route = parseRoute();
   api.onProjectUpdate(handleProjectUpdate);
+  api.onMcpServerStatus?.(handleMcpServerStatus);
+  registerMcpBridge();
 
   root.addEventListener("click", handleClick);
   root.addEventListener("input", handleInput);
@@ -94,9 +171,162 @@ async function bootstrap() {
   window.addEventListener("drop", handleWindowDrop);
   window.addEventListener("beforeunload", () => state.viewer?.destroy());
 
+  if (api.getMcpServerStatus) {
+    handleMcpServerStatus(await api.getMcpServerStatus());
+  }
+
   await syncRoute();
 }
+function handleMcpServerStatus(payload) {
+  if (!payload) {
+    return;
+  }
 
+  const previous = state.mcpServerStatus;
+  state.mcpServerStatus = payload;
+
+  if (!previous || previous.port !== payload.port || previous.ok !== payload.ok || previous.error !== payload.error) {
+    if (payload.ok && payload.usedFallbackPort) {
+      pushToast(`MCP 服务已切换到 ${payload.host}:${payload.port}`, "info");
+    } else if (!payload.ok && payload.error) {
+      pushToast(`MCP 服务启动失败：${payload.error}`, "error");
+    }
+  }
+}
+function registerMcpBridge() {
+  if (!api?.registerMcpCaptureHandler) {
+    return;
+  }
+
+  api.registerMcpCaptureHandler(async (payload) => {
+    if (state.route.page !== "workbench" || !state.viewer || !state.activeProject) {
+      throw new Error("当前没有活动工作台，无法截图。");
+    }
+
+    const mode = payload?.mode === "id-mask" ? "id-mask" : "beauty";
+    const capture = await state.viewer.capture(mode, {
+      width: payload?.width,
+      height: payload?.height,
+      fit: payload?.fit,
+    });
+
+    return {
+      ...capture,
+      mode,
+      projectId: state.activeProject.manifest.projectId,
+      selection: state.workbench?.selection || null,
+      section: state.workbench?.section || null,
+      colorMap: capture.colorMap || [],
+    };
+  });
+
+  if (api?.registerMcpCommandHandler) {
+    api.registerMcpCommandHandler(async (payload) => {
+      return executeMcpCommand(payload || {});
+    });
+  }
+}
+function buildMcpStatePayload() {
+  return state.route.page === "workbench" && state.activeProject && state.workbench
+    ? {
+        route: state.route.page,
+        currentProjectId: state.activeProject.manifest.projectId,
+        projectName: state.activeProject.manifest.projectName,
+        parserMode: state.activeProject.manifest.parserMode,
+        geometryMode: state.activeProject.manifest.geometryMode,
+        selection: state.workbench.selection || null,
+        selectionMode: state.workbench.selectionMode,
+        section: state.workbench.section || null,
+        isolation: state.workbench.isolatedNodeIds ? Array.from(state.workbench.isolatedNodeIds) : [],
+        camera: state.viewer?.snapshot?.() || null,
+        colorMaps: {
+          display: state.viewer?.getColorMap?.("display") || [],
+          "id-mask": state.viewer?.getColorMap?.("id-mask") || [],
+        },
+      }
+    : {
+        route: state.route.page,
+        currentProjectId: null,
+        selection: null,
+        section: null,
+        isolation: [],
+        camera: null,
+        colorMaps: {
+          display: [],
+          "id-mask": [],
+        },
+      };
+}
+
+function publishMcpState() {
+  if (!api?.publishMcpState) {
+    return;
+  }
+
+  api.publishMcpState(buildMcpStatePayload());
+}
+
+async function executeMcpCommand(payload) {
+  if (state.route.page !== "workbench" || !state.activeProject || !state.workbench) {
+    throw new Error("当前没有活动工作台，无法执行 MCP 交互命令。");
+  }
+
+  if (payload.projectId && payload.projectId !== state.activeProject.manifest.projectId) {
+    throw new Error("当前工作台中的项目与目标 projectId 不一致。");
+  }
+
+  const action = payload.action;
+  switch (action) {
+    case "isolate-parts": {
+      const rawPartIds = Array.isArray(payload.partIds) ? payload.partIds : [];
+      const validPartIds = rawPartIds.filter((partId) => state.activeProject.nodeMap.get(partId)?.kind === "part");
+      if (!validPartIds.length) {
+        throw new Error("没有可隔离的零件 ID。");
+      }
+      state.workbench.isolatedNodeIds = new Set(validPartIds);
+      state.workbench.activePanel = "display";
+      break;
+    }
+    case "clear-isolation": {
+      state.workbench.isolatedNodeIds = null;
+      break;
+    }
+    case "set-section-plane": {
+      const axis = ["x", "y", "z"].includes(payload.axis) ? payload.axis : null;
+      if (!axis) {
+        throw new Error("剖切轴必须是 x / y / z。");
+      }
+      const offset = Number(payload.offset);
+      if (!Number.isFinite(offset)) {
+        throw new Error("剖切 offset 无效。");
+      }
+      state.workbench.section.axis = axis;
+      state.workbench.section.offset = offset;
+      state.workbench.section.enabled = payload.enabled !== false;
+      state.workbench.activePanel = "section";
+      break;
+    }
+    case "clear-section-plane": {
+      state.workbench.section.enabled = false;
+      break;
+    }
+    case "capture-step-preview": {
+      if (!payload.step || !state.viewer?.captureStepPreview) {
+        throw new Error("当前 viewer 不支持步骤预览截图。");
+      }
+      return state.viewer.captureStepPreview(payload.step, {
+        width: payload.width,
+        height: payload.height,
+        fit: payload.fit,
+      });
+    }
+    default:
+      throw new Error(`未知 MCP 命令：${action}`);
+  }
+
+  render();
+  return buildMcpStatePayload();
+}
 function parseRoute() {
   const hash = window.location.hash.replace(/^#/, "");
   if (hash.startsWith("/workbench/")) {
@@ -120,7 +350,6 @@ async function handleHashChange() {
   state.route = parseRoute();
   await syncRoute();
 }
-
 async function syncRoute() {
   if (state.route.page === "workbench" && state.route.projectId) {
     await loadProject(state.route.projectId);
@@ -155,7 +384,6 @@ async function loadProject(projectId) {
   state.loadingProjectId = null;
   render();
 }
-
 function hydrateProject(details) {
   const assembly = details.assembly || { nodes: [], meshes: [], rootId: null, bounds: { size: { x: 1, y: 1, z: 1 } } };
   const nodeMap = new Map(assembly.nodes.map((node) => [node.id, node]));
@@ -193,7 +421,9 @@ function createWorkbenchState(project, previousState) {
 
   return {
     projectId: project.manifest.projectId,
+    workspaceMode: previousForSameProject?.workspaceMode || "model",
     activePanel: previousForSameProject?.activePanel || "assembly",
+    reasoningPanel: previousForSameProject?.reasoningPanel || "summary",
     selectionMode: previousForSameProject?.selectionMode || "part",
     selection: defaultSelection,
     expandedNodeIds: previousForSameProject?.expandedNodeIds || new Set(topLevelAssemblies),
@@ -212,10 +442,307 @@ function createWorkbenchState(project, previousState) {
       result: null,
       history: [],
     },
+    reasoning: createEmptyReasoningState(previousForSameProject?.reasoning),
     viewerHint: previousForSameProject?.viewerHint || "拖拽旋转，Shift + 拖拽平移，滚轮缩放",
   };
 }
 
+function getActivePanelMeta() {
+  if (!state.workbench) {
+    return null;
+  }
+
+  return state.workbench.workspaceMode === "reasoning"
+    ? REASONING_PANEL_META[state.workbench.reasoningPanel]
+    : PANEL_META[state.workbench.activePanel];
+}
+
+function getReasoningSelectionPayload() {
+  if (!state.activeProject || !state.workbench) {
+    return {};
+  }
+
+  const selection = state.workbench.reasoning.selection;
+  return {
+    projectId: state.activeProject.manifest.projectId,
+    basePartId: selection.basePartId || undefined,
+    assemblingPartId: selection.assemblingPartId || undefined,
+    sequenceId: selection.sequenceId || undefined,
+    stepIndex: selection.stepIndex || undefined,
+  };
+}
+
+function getReasoningStatusLabel(status) {
+  return {
+    idle: "未分析",
+    loading: "分析中",
+    ready: "已更新",
+    error: "出错",
+  }[status] || "未知";
+}
+
+function getReasoningSequence(sequenceId = state.workbench?.reasoning.selection.sequenceId) {
+  const sequences = state.workbench?.reasoning?.data?.plan?.candidateSequences || [];
+  return sequences.find((item) => item.sequenceId === sequenceId) || sequences[0] || null;
+}
+
+function getPartDisplayName(partId) {
+  if (!partId || !state.activeProject) {
+    return "-";
+  }
+  return state.activeProject.nodeMap.get(partId)?.name || partId;
+}
+
+function applyReasoningOverlay(overlay) {
+  if (!state.workbench) {
+    return;
+  }
+
+  state.workbench.reasoning.overlay = overlay
+    ? { ...createEmptyReasoningOverlay(), ...overlay }
+    : createEmptyReasoningOverlay();
+
+  if (state.viewer && state.workbench.workspaceMode === "reasoning") {
+    syncViewerState();
+  }
+}
+
+function applyReasoningMatingFaceHighlight(baseFaceId, assemblingFaceId) {
+  if (!state.workbench) {
+    return;
+  }
+
+  const reasoning = state.workbench.reasoning;
+  reasoning.selection.highlightedBaseFaceId = baseFaceId || null;
+  reasoning.selection.highlightedAssemblingFaceId = assemblingFaceId || null;
+
+  const stepOverlay = reasoning.data.stepOverlay || createEmptyReasoningOverlay();
+  const overlay = {
+    ...stepOverlay,
+    baseFaceIds: baseFaceId ? [baseFaceId] : stepOverlay.baseFaceIds || [],
+    assemblingFaceIds: assemblingFaceId ? [assemblingFaceId] : stepOverlay.assemblingFaceIds || [],
+  };
+  applyReasoningOverlay(overlay);
+}
+async function refreshReasoningData() {
+  if (!state.activeProject || !state.workbench) {
+    return;
+  }
+
+  const reasoning = state.workbench.reasoning;
+  const projectId = state.activeProject.manifest.projectId;
+  reasoning.status = "loading";
+  reasoning.error = "";
+  render();
+
+  try {
+    const [summary, constraints, planPayload] = await Promise.all([
+      api.getReasoningSummary(projectId),
+      api.getReasoningConstraints(getReasoningSelectionPayload()),
+      api.getReasoningPlan({
+        projectId,
+        basePartId: reasoning.selection.basePartId || undefined,
+        sequenceId: reasoning.selection.sequenceId || undefined,
+        stepIndex: reasoning.selection.stepIndex || undefined,
+      }),
+    ]);
+
+    reasoning.data.summary = summary;
+    reasoning.data.basePartCandidates = constraints.basePartCandidates || [];
+    reasoning.data.matingCandidates = constraints.matingCandidates || [];
+    reasoning.data.insertionCandidates = constraints.insertionCandidates || [];
+    reasoning.data.selectedPair = constraints.selectedPair || null;
+    reasoning.data.constraintsOverlay = constraints.overlay || createEmptyReasoningOverlay();
+    reasoning.data.plan = planPayload.plan || null;
+
+    reasoning.selection.basePartId = constraints.selection?.basePartId || reasoning.selection.basePartId || summary.bestBasePartId || null;
+    reasoning.selection.assemblingPartId = constraints.selection?.assemblingPartId || reasoning.selection.assemblingPartId || null;
+
+    const selectedSequence =
+      (planPayload.plan?.candidateSequences || []).find((item) => item.sequenceId === reasoning.selection.sequenceId) ||
+      planPayload.plan?.candidateSequences?.[0] ||
+      null;
+    reasoning.selection.sequenceId = selectedSequence?.sequenceId || null;
+
+    const selectedStep =
+      selectedSequence?.steps.find((item) => item.stepIndex === Number(reasoning.selection.stepIndex || 0)) ||
+      selectedSequence?.steps?.[0] ||
+      null;
+    reasoning.selection.stepIndex = selectedStep?.stepIndex || null;
+
+    applyReasoningOverlay(reasoning.data.constraintsOverlay);
+    await loadReasoningTransform({ silent: true });
+    await loadReasoningStep({ silent: true });
+    if (!reasoning.data.relativeTransform && reasoning.selection.basePartId && reasoning.selection.assemblingPartId) {
+      await loadReasoningTransform({ silent: true });
+    }
+
+    reasoning.status = "ready";
+    reasoning.error = "";
+    reasoning.refreshedAt = new Date().toISOString();
+  } catch (error) {
+    reasoning.status = "error";
+    reasoning.error = error?.message || String(error);
+  }
+
+  render();
+}
+
+async function selectReasoningBasePart(basePartId) {
+  if (!state.workbench) {
+    return;
+  }
+
+  state.workbench.reasoning.selection.basePartId = basePartId || null;
+  state.workbench.reasoning.selection.assemblingPartId = null;
+  state.workbench.reasoning.selection.sequenceId = null;
+  state.workbench.reasoning.selection.stepIndex = null;
+  state.workbench.reasoning.selection.highlightedBaseFaceId = null;
+  state.workbench.reasoning.selection.highlightedAssemblingFaceId = null;
+  await refreshReasoningData();
+}
+async function selectReasoningPair(basePartId, assemblingPartId) {
+  if (!state.workbench || !state.activeProject) {
+    return;
+  }
+
+  const reasoning = state.workbench.reasoning;
+  reasoning.selection.basePartId = basePartId || null;
+  reasoning.selection.assemblingPartId = assemblingPartId || null;
+  reasoning.selection.highlightedBaseFaceId = null;
+  reasoning.selection.highlightedAssemblingFaceId = null;
+  reasoning.error = "";
+  render();
+
+  try {
+    const constraints = await api.getReasoningConstraints(getReasoningSelectionPayload());
+    reasoning.data.basePartCandidates = constraints.basePartCandidates || reasoning.data.basePartCandidates;
+    reasoning.data.matingCandidates = constraints.matingCandidates || reasoning.data.matingCandidates;
+    reasoning.data.insertionCandidates = constraints.insertionCandidates || [];
+    reasoning.data.selectedPair = constraints.selectedPair || null;
+    reasoning.data.constraintsOverlay = constraints.overlay || createEmptyReasoningOverlay();
+    applyReasoningOverlay(reasoning.data.constraintsOverlay);
+    await loadReasoningTransform({ silent: true });
+    render();
+  } catch (error) {
+    reasoning.error = error?.message || String(error);
+    render();
+  }
+}
+async function selectReasoningSequence(sequenceId) {
+  if (!state.workbench) {
+    return;
+  }
+
+  const reasoning = state.workbench.reasoning;
+  reasoning.selection.sequenceId = sequenceId || null;
+  reasoning.selection.highlightedBaseFaceId = null;
+  reasoning.selection.highlightedAssemblingFaceId = null;
+  const sequence = getReasoningSequence(sequenceId);
+  reasoning.selection.stepIndex = sequence?.steps?.[0]?.stepIndex || null;
+  await loadReasoningStep({ silent: true });
+  render();
+}
+async function selectReasoningStep(sequenceId, stepIndex) {
+  if (!state.workbench) {
+    return;
+  }
+
+  state.workbench.reasoning.selection.sequenceId = sequenceId || null;
+  state.workbench.reasoning.selection.stepIndex = Number(stepIndex) || null;
+  state.workbench.reasoningPanel = "steps";
+  await loadReasoningStep();
+}
+
+async function loadReasoningTransform(options = {}) {
+  if (!state.workbench || !state.activeProject) {
+    return null;
+  }
+
+  const reasoning = state.workbench.reasoning;
+  const { basePartId, assemblingPartId } = reasoning.selection;
+  if (!basePartId || !assemblingPartId) {
+    reasoning.data.relativeTransform = null;
+    reasoning.data.interference = null;
+    return null;
+  }
+
+  try {
+    const payload = await api.getReasoningTransform(getReasoningSelectionPayload());
+    reasoning.data.relativeTransform = payload.relativeTransform;
+    reasoning.data.insertionCandidates = payload.insertionCandidates || reasoning.data.insertionCandidates;
+    reasoning.data.interference = payload.interference || null;
+    reasoning.data.transformOverlay = payload.overlay || createEmptyReasoningOverlay();
+    reasoning.selection.basePartId = payload.selection?.basePartId || reasoning.selection.basePartId;
+    reasoning.selection.assemblingPartId = payload.selection?.assemblingPartId || reasoning.selection.assemblingPartId;
+    if (state.workbench.reasoningPanel === "transform") {
+      applyReasoningOverlay(reasoning.data.transformOverlay);
+    }
+    if (!options.silent) {
+      render();
+    }
+    return payload;
+  } catch (error) {
+    if (!options.silent) {
+      reasoning.error = error?.message || String(error);
+      render();
+    }
+    return null;
+  }
+}
+
+async function loadReasoningStep(options = {}) {
+  if (!state.workbench || !state.activeProject) {
+    return null;
+  }
+
+  const reasoning = state.workbench.reasoning;
+  if (!reasoning.selection.sequenceId) {
+    return null;
+  }
+
+  try {
+    const payload = await api.getReasoningStep(getReasoningSelectionPayload());
+    reasoning.data.stepExplanation = payload;
+    reasoning.data.stepOverlay = payload.overlay || createEmptyReasoningOverlay();
+    reasoning.selection.sequenceId = payload.sequenceId;
+    reasoning.selection.stepIndex = payload.stepIndex;
+    reasoning.selection.basePartId = payload.basePart?.partId || reasoning.selection.basePartId;
+    reasoning.selection.assemblingPartId = payload.assemblingPart?.partId || reasoning.selection.assemblingPartId;
+    reasoning.selection.highlightedBaseFaceId = payload.matingFaces?.[0]?.baseFaceId || null;
+    reasoning.selection.highlightedAssemblingFaceId = payload.matingFaces?.[0]?.partFaceId || null;
+    applyReasoningMatingFaceHighlight(
+      reasoning.selection.highlightedBaseFaceId,
+      reasoning.selection.highlightedAssemblingFaceId,
+    );
+
+    reasoning.data.stepPreview = null;
+    reasoning.data.stepPreviewError = "";
+    if (state.viewer && options.capturePreview !== false) {
+      try {
+        reasoning.data.stepPreview = await api.captureReasoningStepPreview({
+          ...getReasoningSelectionPayload(),
+          width: 540,
+          height: 300,
+          fit: true,
+        });
+      } catch (previewError) {
+        reasoning.data.stepPreviewError = previewError?.message || String(previewError);
+      }
+    }
+
+    if (!options.silent) {
+      render();
+    }
+    return payload;
+  } catch (error) {
+    if (!options.silent) {
+      reasoning.error = error?.message || String(error);
+      render();
+    }
+    return null;
+  }
+}
 function destroyViewer() {
   if (state.viewer) {
     state.viewer.destroy();
@@ -284,6 +811,7 @@ function render(options = {}) {
   }
 
   toggleDragMask(state.globalDragging);
+  publishMcpState();
 }
 
 function renderHomePageWireframe() {
@@ -291,15 +819,15 @@ function renderHomePageWireframe() {
   const readyCount = state.projects.filter((project) => project.status === "ready").length;
   const parsingCount = state.projects.filter((project) => project.status === "parsing").length;
   const failedCount = state.projects.filter((project) => project.status === "failed").length;
+  const mcpSummary = state.mcpServerStatus?.ok ? `MCP ${state.mcpServerStatus.port}` : "MCP 未启动";
 
-  return `
-    <main class="page home-page">
+  return `    <main class="page home-page">
       <section class="topbar glass-panel home-topbar">
         <div class="brand-lockup">
           <div class="brand-mark"></div>
           <div class="brand-text">
             <h1>STEP Workbench MVP</h1>
-            <p>首页聚焦 STEP 导入和项目卡片浏览，保持和线框图一致的结构节奏。</p>
+            <p>首页聚焦 STEP 导入、项目浏览和工作台入口，方便我们快速进入模型分析。</p>
           </div>
         </div>
         <div class="home-actions">
@@ -321,8 +849,8 @@ function renderHomePageWireframe() {
       <section class="upload-zone home-upload-zone ${state.globalDragging ? "is-dragging" : ""}" data-action="pick-step">
         <div class="home-upload-copy">
           <button class="secondary-button upload-zone-cta" data-action="pick-step">上传 STEP</button>
-          <h2>拖拽文件到此处，或点击按钮选择本地 STEP 模型</h2>
-          <p>支持 .step / .stp，导入后会自动创建项目卡片并进入解析流程。</p>
+          <h2>拖拽文件到这里，或点击按钮选择本地 STEP 模型</h2>
+          <p>支持 <code>.step / .stp</code>，导入后会自动创建项目卡片并进入解析流程。</p>
         </div>
       </section>
 
@@ -336,6 +864,7 @@ function renderHomePageWireframe() {
           <span class="summary-pill">可打开 ${readyCount}</span>
           <span class="summary-pill">解析中 ${parsingCount}</span>
           <span class="summary-pill">异常 ${failedCount}</span>
+          <span class="summary-pill">${escapeHtml(mcpSummary)}</span>
         </div>
       </section>
 
@@ -392,13 +921,12 @@ function updateHomeResultsSection() {
 
 function renderProjectCardWireframe(project) {
   const progress = normalizeProgress(project.progress);
-  const meta =
-    {
-      pending: { label: "待处理", className: "status-pending" },
-      parsing: { label: "解析中", className: "status-parsing" },
-      ready: { label: "可打开", className: "status-ready" },
-      failed: { label: "解析失败", className: "status-failed" },
-    }[project.status] || { label: "待处理", className: "status-pending" };
+  const meta = {
+    pending: { label: "待处理", className: "status-pending" },
+    parsing: { label: "解析中", className: "status-parsing" },
+    ready: { label: "可打开", className: "status-ready" },
+    failed: { label: "解析失败", className: "status-failed" },
+  }[project.status] || { label: "待处理", className: "status-pending" };
   const clickable = project.status === "ready";
   const menuOpen = state.openProjectMenuId === project.projectId;
   const openAction = clickable ? `data-action="open-project" data-project-id="${project.projectId}"` : "";
@@ -434,16 +962,8 @@ function renderProjectCardWireframe(project) {
               menuOpen
                 ? `
                   <div class="project-menu-panel glass-panel" data-role="project-menu">
-                    ${
-                      clickable
-                        ? `<button class="project-menu-item" type="button" data-action="open-project" data-project-id="${project.projectId}">打开工作台</button>`
-                        : ""
-                    }
-                    ${
-                      project.status === "failed"
-                        ? `<button class="project-menu-item" type="button" data-action="retry-project" data-project-id="${project.projectId}">重新解析</button>`
-                        : ""
-                    }
+                    ${clickable ? `<button class="project-menu-item" type="button" data-action="open-project" data-project-id="${project.projectId}">打开工作台</button>` : ""}
+                    ${project.status === "failed" ? `<button class="project-menu-item" type="button" data-action="retry-project" data-project-id="${project.projectId}">重新解析</button>` : ""}
                     <button class="project-menu-item" type="button" data-action="rename-project" data-project-id="${project.projectId}">重命名</button>
                     <button class="project-menu-item" type="button" data-action="open-source-dir" data-project-id="${project.projectId}">打开源目录</button>
                     <button class="project-menu-item is-danger" type="button" data-action="delete-project" data-project-id="${project.projectId}">删除项目</button>
@@ -455,9 +975,9 @@ function renderProjectCardWireframe(project) {
         </div>
         <div class="project-card-bottom">
           <div class="project-facts-grid">
-            <span>装配数: <strong>${project.assemblyCount || "-"}</strong></span>
-            <span>零件数: <strong>${project.partCount || "-"}</strong></span>
-            <span>大小: <strong>${formatBytes(project.sourceFileSize)}</strong></span>
+            <span>装配数 <strong>${project.assemblyCount || "-"}</strong></span>
+            <span>零件数 <strong>${project.partCount || "-"}</strong></span>
+            <span>大小 <strong>${formatBytes(project.sourceFileSize)}</strong></span>
           </div>
           ${
             project.status === "parsing"
@@ -474,7 +994,7 @@ function renderProjectCardWireframe(project) {
               `
               : project.status === "failed"
                 ? `<div class="error-box project-feedback">${escapeHtml(project.errorSummary || "解析失败，请重试。")}</div>`
-                : `<div class="project-updated-time">更新时间: ${formatDateTime(project.updatedAt)}</div>`
+                : `<div class="project-updated-time">更新时间：${formatDateTime(project.updatedAt)}</div>`
           }
         </div>
       </div>
@@ -483,210 +1003,16 @@ function renderProjectCardWireframe(project) {
 }
 
 function renderHomePage() {
-  const filteredProjects = getFilteredProjects();
-  const readyCount = state.projects.filter((project) => project.status === "ready").length;
-  const parsingCount = state.projects.filter((project) => project.status === "parsing").length;
-  const failedCount = state.projects.filter((project) => project.status === "failed").length;
-
-  return `
-    <main class="page home-page">
-      <section class="topbar glass-panel">
-        <div class="brand-lockup">
-          <div class="brand-mark"></div>
-          <div class="brand-text">
-            <h1>STEP Workbench MVP</h1>
-            <p>围绕 STEP 装配模型导入、解析、缓存与可视化工作台的首版桌面实现。</p>
-          </div>
-        </div>
-        <div class="home-actions">
-          <input
-            type="search"
-            placeholder="搜索项目名 / 文件名"
-            value="${escapeHtml(state.searchText)}"
-            data-bind="home-search"
-          />
-          <select data-bind="home-filter">
-            ${renderStatusOptions(state.filterStatus)}
-          </select>
-          <button class="primary-button" data-action="pick-step">
-            <span>导入 STEP</span>
-          </button>
-        </div>
-      </section>
-
-      <section class="hero">
-        <div class="hero-copy glass-panel">
-          <span class="eyebrow">MVP Main Flow</span>
-          <h2>从导入文件到进入工作台，先把首版闭环跑通。</h2>
-          <p>
-            当前实现贴合产品手册，把模型中心页、项目缓存目录、解析进度状态机、工作台基础操作和可交互 viewer
-            一次性打通。真实 STEP / BRep 内核后续可以直接替换目前的模拟 Sidecar。
-          </p>
-          <div class="stats-strip">
-            <div class="stat-card">
-              <strong>${state.projects.length}</strong>
-              <span>项目总数</span>
-            </div>
-            <div class="stat-card">
-              <strong>${readyCount}</strong>
-              <span>可打开项目</span>
-            </div>
-            <div class="stat-card">
-              <strong>${parsingCount + failedCount}</strong>
-              <span>处理中 / 异常</span>
-            </div>
-          </div>
-        </div>
-        <div class="hero-side glass-panel">
-          <h3>首版已落地的关键能力</h3>
-          <p>主页强调导入与卡片浏览，工作台强调 3D 主视图和装配树联动，和手册目标保持同一个节奏。</p>
-          <div class="feature-list">
-            <div class="feature-item">
-              <strong>本地缓存结构</strong>
-              <span>自动生成 \`manifest.json\`、\`assembly.json\`、\`source.step\`、\`thumbnail.svg\`。</span>
-            </div>
-            <div class="feature-item">
-              <strong>解析状态机</strong>
-              <span>从待处理到解析中再到可打开，支持失败重试与实时进度反馈。</span>
-            </div>
-            <div class="feature-item">
-              <strong>工作台交互</strong>
-              <span>支持装配树、选择模式、显示控制、基础测量、单平面剖切与截图导出。</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section-head">
-        <div class="section-title">
-          <h3>导入与模型中心</h3>
-          <p>上传区和项目卡片列表会共同承担首版的主入口任务。</p>
-        </div>
-      </section>
-
-      <section class="upload-zone ${state.globalDragging ? "is-dragging" : ""}" data-action="pick-step">
-        <div class="upload-zone-top">
-          <div class="upload-zone-copy">
-            <h3>拖拽 STEP 文件到这里，或点击进入文件选择器</h3>
-            <p>支持 \`.step / .stp\`。导入后会立刻创建项目目录，并进入模拟解析流水线，方便前后端接口先对齐。</p>
-          </div>
-          <button class="primary-button" data-action="pick-step">上传 STEP</button>
-        </div>
-        <div class="upload-hint-row">
-          <span class="hint-pill">一项目一目录</span>
-          <span class="hint-pill">解析状态实时反馈</span>
-          <span class="hint-pill">失败可重试</span>
-          <span class="hint-pill">缩略图自动生成</span>
-        </div>
-      </section>
-
-      <section class="section-head">
-        <div class="section-title">
-          <h3>项目卡片</h3>
-          <p>共 ${filteredProjects.length} 个结果，按最近更新时间排序。</p>
-        </div>
-      </section>
-
-      ${
-        filteredProjects.length
-          ? `<section class="project-grid">${filteredProjects.map((project) => renderProjectCard(project)).join("")}</section>`
-          : `
-            <section class="empty-state glass-panel">
-              <h3>还没有匹配的项目</h3>
-              <p>
-                可以先导入一个 STEP 文件来生成首个项目；如果你已经导入过内容，也可以调整搜索词或筛选条件重新查看。
-              </p>
-            </section>
-          `
-      }
-    </main>
-  `;
+  return renderHomePageWireframe();
 }
 
 function renderStatusOptions(selected) {
-  const options = [
-    { value: "all", label: "全部状态" },
-    { value: "ready", label: "可打开" },
-    { value: "parsing", label: "解析中" },
-    { value: "failed", label: "解析失败" },
-    { value: "pending", label: "待处理" },
-  ];
-
-  return options
-    .map(
-      (option) =>
-        `<option value="${option.value}" ${selected === option.value ? "selected" : ""}>${option.label}</option>`,
-    )
-    .join("");
+  return renderStatusOptionsWireframe(selected);
 }
 
 function renderProjectCard(project) {
-  const meta = STATUS_META[project.status] || STATUS_META.pending;
-  const clickable = project.status === "ready";
-  return `
-    <article class="project-card ${clickable ? "is-clickable" : ""}" data-project-id="${project.projectId}">
-      <div class="thumbnail-frame ${project.thumbnailDataUrl ? "" : "is-empty"}" ${
-        clickable ? `data-action="open-project" data-project-id="${project.projectId}"` : ""
-      }>
-        ${project.thumbnailDataUrl ? `<img alt="${escapeHtml(project.projectName)}" src="${project.thumbnailDataUrl}" />` : ""}
-      </div>
-      <div class="project-card-top">
-        <div class="project-meta">
-          <h4>${escapeHtml(project.projectName)}</h4>
-          <p>${escapeHtml(project.sourceFileName)}</p>
-        </div>
-        <span class="status-pill ${meta.className}">${meta.label}${project.status === "parsing" ? ` ${project.progress || 0}%` : ""}</span>
-      </div>
-      <div class="project-facts">
-        <div class="fact-card">
-          <strong>装配数</strong>
-          <span>${project.assemblyCount || "-"}</span>
-        </div>
-        <div class="fact-card">
-          <strong>零件数</strong>
-          <span>${project.partCount || "-"}</span>
-        </div>
-        <div class="fact-card">
-          <strong>文件大小</strong>
-          <span>${formatBytes(project.sourceFileSize)}</span>
-        </div>
-      </div>
-      ${
-        project.status === "parsing"
-          ? `
-            <div class="progress-block">
-              <div class="progress-copy">
-                <span>${escapeHtml(project.currentStage || "解析中")}</span>
-                <strong>${project.progress || 0}%</strong>
-              </div>
-              <div class="progress-track">
-                <div class="progress-value" style="width: ${project.progress || 0}%"></div>
-              </div>
-            </div>
-          `
-          : project.status === "failed"
-            ? `<div class="error-box">${escapeHtml(project.errorSummary || "解析失败，请重试。")}</div>`
-            : `<div class="inline-note">更新时间：${formatDateTime(project.updatedAt)}</div>`
-      }
-      <div class="project-actions">
-        ${
-          clickable
-            ? `<button class="secondary-button" data-action="open-project" data-project-id="${project.projectId}">打开工作台</button>`
-            : ""
-        }
-        ${
-          project.status === "failed"
-            ? `<button class="secondary-button" data-action="retry-project" data-project-id="${project.projectId}">重新解析</button>`
-            : ""
-        }
-        <button class="ghost-button" data-action="rename-project" data-project-id="${project.projectId}">重命名</button>
-        <button class="ghost-button" data-action="open-source-dir" data-project-id="${project.projectId}">源目录</button>
-        <button class="ghost-button" data-action="delete-project" data-project-id="${project.projectId}">删除</button>
-      </div>
-    </article>
-  `;
+  return renderProjectCardWireframe(project);
 }
-
 function renderWorkbenchPage() {
   if (state.loadingProjectId || !state.activeProject || !state.workbench) {
     return `
@@ -700,41 +1026,58 @@ function renderWorkbenchPage() {
   }
 
   const { manifest } = state.activeProject;
+  const reasoning = state.workbench.reasoning;
+  const isReasoningMode = state.workbench.workspaceMode === "reasoning";
   const selectedLabel = getSelectionLabel();
   const visiblePartCount = getVisiblePartCount();
   const hiddenPartCount = state.activeProject.partNodes.length - visiblePartCount;
-  const activePanelMeta = PANEL_META[state.workbench.activePanel];
+  const activePanelMeta = getActivePanelMeta();
+  const navigation = isReasoningMode ? REASONING_PANEL_META : PANEL_META;
+  const currentStep = reasoning.data.stepExplanation;
+  const focusBaseName = getPartDisplayName(reasoning.selection.basePartId);
+  const focusAssemblingName = getPartDisplayName(reasoning.selection.assemblingPartId);
 
   return `
     <main class="workbench-shell">
       <header class="workbench-toolbar">
-        <div class="toolbar-cluster">
+        <div class="toolbar-cluster toolbar-cluster-main">
           <button class="secondary-button" data-action="go-home">返回首页</button>
           <div class="toolbar-title">
             <strong>${escapeHtml(manifest.projectName)}</strong>
             <span>${escapeHtml(manifest.sourceFileName)}</span>
           </div>
+          ${renderWorkspaceModeSwitch()}
         </div>
-        <div class="toolbar-cluster">
+        <div class="toolbar-cluster toolbar-cluster-actions">
           <button class="toolbar-button" data-action="viewer-fit">适配</button>
           ${["front", "left", "top", "right", "back", "bottom"].map((preset) => renderPresetButton(preset)).join("")}
           <button class="toolbar-button ${state.workbench.selectionMode === "face" ? "is-active" : ""}" data-action="toggle-selection-mode">
             ${state.workbench.selectionMode === "face" ? "面级选择" : "零件选择"}
           </button>
-          <button class="toolbar-button ${state.workbench.isolatedNodeIds ? "is-active" : ""}" data-action="isolate-selection">隔离</button>
-          <button class="toolbar-button ${state.workbench.measure.enabled ? "is-active" : ""}" data-action="toggle-measure">测量</button>
-          <button class="toolbar-button ${state.workbench.section.enabled ? "is-active" : ""}" data-action="toggle-section">剖切</button>
+          ${
+            isReasoningMode
+              ? `<button class="toolbar-button ${reasoning.status === "loading" ? "is-active" : ""}" data-action="refresh-reasoning">刷新推理</button>`
+              : `
+                <button class="toolbar-button ${state.workbench.isolatedNodeIds ? "is-active" : ""}" data-action="isolate-selection">隔离</button>
+                <button class="toolbar-button ${state.workbench.measure.enabled ? "is-active" : ""}" data-action="toggle-measure">测量</button>
+                <button class="toolbar-button ${state.workbench.section.enabled ? "is-active" : ""}" data-action="toggle-section">剖切</button>
+              `
+          }
           <button class="toolbar-button" data-action="save-screenshot">截图</button>
         </div>
       </header>
 
-      <section class="workbench-body">
+      <section class="workbench-body ${isReasoningMode ? "is-reasoning" : ""}">
         <nav class="nav-rail">
-          ${Object.entries(PANEL_META)
+          ${Object.entries(navigation)
             .map(([key, panel]) => {
-              const isActive = key === state.workbench.activePanel;
+              const isActive = isReasoningMode ? key === state.workbench.reasoningPanel : key === state.workbench.activePanel;
               return `
-                <button class="nav-button ${isActive ? "is-active" : ""}" data-action="set-panel" data-panel="${key}">
+                <button
+                  class="nav-button ${isActive ? "is-active" : ""}"
+                  data-action="${isReasoningMode ? "set-reasoning-panel" : "set-panel"}"
+                  data-panel="${key}"
+                >
                   <strong>${panel.icon}</strong>
                   <span>${panel.title}</span>
                 </button>
@@ -743,10 +1086,10 @@ function renderWorkbenchPage() {
             .join("")}
         </nav>
 
-        <aside class="side-panel">
+        <aside class="side-panel ${isReasoningMode ? "reasoning-side-panel" : ""}">
           <div class="side-panel-header">
-            <h3>${activePanelMeta.title}</h3>
-            <p>${activePanelMeta.description}</p>
+            <h3>${activePanelMeta?.title || "工作台"}</h3>
+            <p>${activePanelMeta?.description || ""}</p>
           </div>
           <div class="side-panel-scroll">
             ${renderWorkbenchPanel()}
@@ -757,22 +1100,23 @@ function renderWorkbenchPage() {
           <div class="viewer-grid"></div>
           <canvas id="viewer-canvas" class="viewer-canvas"></canvas>
           <div class="viewer-overlay-top">
+            <div class="viewer-chip"><strong>工作区</strong><span>${isReasoningMode ? "装配推理" : "模型工作台"}</span></div>
             <div class="viewer-chip"><strong>选择模式</strong><span>${state.workbench.selectionMode === "face" ? "面级" : "零件级"}</span></div>
-            <div class="viewer-chip"><strong>当前剖切</strong><span>${state.workbench.section.enabled ? `${state.workbench.section.axis.toUpperCase()} = ${Math.round(state.workbench.section.offset)}` : "关闭"}</span></div>
+            <div class="viewer-chip"><strong>${isReasoningMode ? "推理状态" : "当前剖切"}</strong><span>${isReasoningMode ? getReasoningStatusLabel(reasoning.status) : state.workbench.section.enabled ? `${state.workbench.section.axis.toUpperCase()} = ${Math.round(state.workbench.section.offset)}` : "关闭"}</span></div>
           </div>
-          <div class="viewer-floating">
+          <div class="viewer-floating ${isReasoningMode ? "is-visible" : ""}">
             <div class="floating-card">
-              <h4>当前选中</h4>
-              <p>${escapeHtml(selectedLabel)}</p>
+              <h4>${isReasoningMode ? "推理焦点" : "当前选中"}</h4>
+              <p>${isReasoningMode ? `${escapeHtml(focusBaseName)} -> ${escapeHtml(focusAssemblingName)}` : escapeHtml(selectedLabel)}</p>
             </div>
             <div class="floating-card">
-              <h4>显示摘要</h4>
-              <p>可见零件 ${visiblePartCount} / ${state.activeProject.partNodes.length}，隐藏 ${hiddenPartCount}。</p>
+              <h4>${isReasoningMode ? "当前步骤" : "显示摘要"}</h4>
+              <p>${isReasoningMode ? currentStep ? `${escapeHtml(currentStep.sequenceId)} / Step ${currentStep.stepIndex}` : "选择候选或步骤后联动 viewer" : `可见零件 ${visiblePartCount} / ${state.activeProject.partNodes.length}，隐藏 ${hiddenPartCount}`}</p>
             </div>
           </div>
           <div class="viewer-overlay-bottom">
             <div class="viewer-chip"><strong>操作提示</strong><span data-role="viewer-hint">${escapeHtml(state.workbench.viewerHint)}</span></div>
-            <div class="viewer-chip"><strong>对象状态</strong><span>${state.workbench.isolatedNodeIds ? "隔离中" : "显示全部 / 自定义显隐"}</span></div>
+            <div class="viewer-chip"><strong>${isReasoningMode ? "当前聚焦" : "对象状态"}</strong><span>${isReasoningMode ? `${escapeHtml(focusBaseName)} / ${escapeHtml(focusAssemblingName)}` : state.workbench.isolatedNodeIds ? "隔离中" : "显示全部 / 自定义显隐"}</span></div>
           </div>
         </section>
       </section>
@@ -780,9 +1124,10 @@ function renderWorkbenchPage() {
       <footer class="statusbar">
         <div class="status-items">
           <span>项目：<strong>${escapeHtml(manifest.projectName)}</strong></span>
+          <span>工作区：<strong>${isReasoningMode ? "装配推理" : "模型工作台"}</strong></span>
           <span>选中对象：<strong>${escapeHtml(selectedLabel)}</strong></span>
-          <span>选择类型：<strong>${state.workbench.selectionMode === "face" ? "面级" : "零件级"}</strong></span>
           <span>零件 / 面数：<strong>${manifest.partCount} / ${manifest.faceCount}</strong></span>
+          ${isReasoningMode ? `<span>当前步骤：<strong>${currentStep ? `${escapeHtml(currentStep.sequenceId)} / Step ${currentStep.stepIndex}` : "未选中"}</strong></span>` : ""}
         </div>
         <span data-role="status-hint">${escapeHtml(state.workbench.viewerHint)}</span>
       </footer>
@@ -790,6 +1135,14 @@ function renderWorkbenchPage() {
   `;
 }
 
+function renderWorkspaceModeSwitch() {
+  return `
+    <div class="workspace-switch">
+      <button class="workspace-switch-button ${state.workbench.workspaceMode === "model" ? "is-active" : ""}" data-action="set-workspace-mode" data-workspace-mode="model">模型工作台</button>
+      <button class="workspace-switch-button ${state.workbench.workspaceMode === "reasoning" ? "is-active" : ""}" data-action="set-workspace-mode" data-workspace-mode="reasoning">装配推理</button>
+    </div>
+  `;
+}
 function renderPresetButton(preset) {
   const labelMap = {
     front: "前视",
@@ -802,8 +1155,11 @@ function renderPresetButton(preset) {
 
   return `<button class="toolbar-button" data-action="viewer-preset" data-preset="${preset}">${labelMap[preset]}</button>`;
 }
-
 function renderWorkbenchPanel() {
+  if (state.workbench.workspaceMode === "reasoning") {
+    return renderReasoningPanel();
+  }
+
   switch (state.workbench.activePanel) {
     case "overview":
       return renderOverviewPanel();
@@ -822,6 +1178,333 @@ function renderWorkbenchPanel() {
   }
 }
 
+function renderReasoningPanel() {
+  switch (state.workbench.reasoningPanel) {
+    case "summary":
+      return renderReasoningSummaryPanel();
+    case "constraints":
+      return renderReasoningConstraintsPanel();
+    case "transform":
+      return renderReasoningTransformPanel();
+    case "plan":
+      return renderReasoningPlanPanel();
+    case "steps":
+      return renderReasoningStepPanel();
+    default:
+      return "";
+  }
+}
+
+function renderReasoningStatusNotice() {
+  const reasoning = state.workbench.reasoning;
+  if (reasoning.status === "loading") {
+    return `<div class="inline-note reasoning-note">正在刷新装配推理结果...</div>`;
+  }
+  if (reasoning.status === "error") {
+    return `<div class="inline-note reasoning-note is-error">${escapeHtml(reasoning.error || "推理失败")}</div>`;
+  }
+  if (reasoning.refreshedAt) {
+    return `<div class="inline-note reasoning-note">最近更新：${formatDateTime(reasoning.refreshedAt)}</div>`;
+  }
+  return `<div class="inline-note reasoning-note">还没有运行过推理分析。</div>`;
+}
+
+function renderReasoningSummaryPanel() {
+  const reasoning = state.workbench.reasoning;
+  const summary = reasoning.data.summary;
+  return `
+    <div class="panel-card">
+      <div class="panel-actions">
+        <h4>分析概览</h4>
+        <button class="secondary-button" data-action="refresh-reasoning">刷新分析</button>
+      </div>
+      ${renderReasoningStatusNotice()}
+      <div class="metric-grid">
+        <div class="metric-card"><span>基准件候选</span><strong>${summary?.baseCandidateCount ?? reasoning.data.basePartCandidates.length}</strong></div>
+        <div class="metric-card"><span>配合候选</span><strong>${summary?.matingCandidateCount ?? reasoning.data.matingCandidates.length}</strong></div>
+        <div class="metric-card"><span>候选序列</span><strong>${summary?.sequenceCount ?? (reasoning.data.plan?.candidateSequences?.length || 0)}</strong></div>
+        <div class="metric-card"><span>最高置信度</span><strong>${formatConfidence(summary?.topConfidence || 0)}</strong></div>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>当前焦点</h4>
+      <div class="overview-grid">
+        <div class="overview-row"><span>基准件</span><strong>${escapeHtml(getPartDisplayName(reasoning.selection.basePartId))}</strong></div>
+        <div class="overview-row"><span>装配件</span><strong>${escapeHtml(getPartDisplayName(reasoning.selection.assemblingPartId))}</strong></div>
+        <div class="overview-row"><span>序列</span><strong>${escapeHtml(reasoning.selection.sequenceId || "-")}</strong></div>
+        <div class="overview-row"><span>步骤</span><strong>${reasoning.selection.stepIndex || "-"}</strong></div>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>操作建议</h4>
+      <div class="control-grid">
+        <button class="secondary-button" data-action="set-reasoning-panel" data-panel="constraints">查看约束发现</button>
+        <button class="secondary-button" data-action="set-reasoning-panel" data-panel="plan">查看装配计划</button>
+        <button class="secondary-button" data-action="set-reasoning-panel" data-panel="steps">查看步骤讲解</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderReasoningConstraintsPanel() {
+  const reasoning = state.workbench.reasoning;
+  const selectedBasePartId = reasoning.selection.basePartId;
+  const selectedAssemblingPartId = reasoning.selection.assemblingPartId;
+
+  return `
+    ${renderReasoningStatusNotice()}
+    <div class="panel-card">
+      <h4>基准件候选</h4>
+      <div class="reasoning-list">
+        ${
+          reasoning.data.basePartCandidates.length
+            ? reasoning.data.basePartCandidates
+                .map(
+                  (candidate) => `
+                    <button class="reasoning-item ${candidate.partId === selectedBasePartId ? "is-active" : ""}" data-action="select-reasoning-base" data-base-part-id="${candidate.partId}">
+                      <strong>${escapeHtml(getPartDisplayName(candidate.partId))}</strong>
+                      <span>score ${formatConfidence(candidate.score)}</span>
+                    </button>
+                  `,
+                )
+                .join("")
+            : `<div class="inline-note">暂无基准件候选。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>配合候选</h4>
+      <div class="reasoning-list">
+        ${
+          reasoning.data.matingCandidates.length
+            ? reasoning.data.matingCandidates
+                .slice(0, 12)
+                .map((pair) => {
+                  const pairBaseId = selectedBasePartId ? selectedBasePartId : pair.partAId;
+                  const pairAssemblingId = pair.partAId === pairBaseId ? pair.partBId : pair.partAId;
+                  const isActive = pairBaseId === selectedBasePartId && pairAssemblingId === selectedAssemblingPartId;
+                  return `
+                    <button class="reasoning-item ${isActive ? "is-active" : ""}" data-action="select-reasoning-pair" data-base-part-id="${pairBaseId}" data-assembling-part-id="${pairAssemblingId}">
+                      <strong>${escapeHtml(getPartDisplayName(pairBaseId))} -> ${escapeHtml(getPartDisplayName(pairAssemblingId))}</strong>
+                      <span>${escapeHtml(pair.relation)} / ${formatConfidence(pair.score)}</span>
+                    </button>
+                  `;
+                })
+                .join("")
+            : `<div class="inline-note">暂无配合候选。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>插入方向候选</h4>
+      <div class="reasoning-list">
+        ${
+          reasoning.data.insertionCandidates.length
+            ? reasoning.data.insertionCandidates
+                .map(
+                  (candidate) => `
+                    <div class="reasoning-item is-static">
+                      <strong>${escapeHtml(getPartDisplayName(candidate.partId))} -> ${escapeHtml(getPartDisplayName(candidate.basePartId))}</strong>
+                      <span>axis ${escapeHtml(formatVector(candidate.insertionAxis))} / distance ${formatNumber(candidate.travelDistance)}</span>
+                    </div>
+                  `,
+                )
+                .join("")
+            : `<div class="inline-note">选择一个配合候选后查看插入方向。</div>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderReasoningTransformPanel() {
+  const reasoning = state.workbench.reasoning;
+  const transform = reasoning.data.relativeTransform;
+  const interference = reasoning.data.interference;
+
+  return `
+    ${renderReasoningStatusNotice()}
+    <div class="panel-card">
+      <div class="panel-actions">
+        <h4>姿态与干涉</h4>
+        <button class="secondary-button" data-action="refresh-reasoning-transform">刷新校验</button>
+      </div>
+      <div class="overview-grid">
+        <div class="overview-row"><span>基准件</span><strong>${escapeHtml(getPartDisplayName(reasoning.selection.basePartId))}</strong></div>
+        <div class="overview-row"><span>装配件</span><strong>${escapeHtml(getPartDisplayName(reasoning.selection.assemblingPartId))}</strong></div>
+        <div class="overview-row"><span>平移</span><strong>${transform ? escapeHtml(formatVector(transform.translation)) : "-"}</strong></div>
+        <div class="overview-row"><span>姿态四元数</span><strong>${transform ? escapeHtml(formatQuaternion(transform.quaternion)) : "-"}</strong></div>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>插入方向</h4>
+      <div class="reasoning-list">
+        ${
+          reasoning.data.insertionCandidates.length
+            ? reasoning.data.insertionCandidates
+                .map(
+                  (candidate) => `
+                    <div class="reasoning-item is-static">
+                      <strong>${escapeHtml(getPartDisplayName(candidate.partId))}</strong>
+                      <span>axis ${escapeHtml(formatVector(candidate.insertionAxis))} / score ${formatConfidence(candidate.score)}</span>
+                    </div>
+                  `,
+                )
+                .join("")
+            : `<div class="inline-note">暂无插入方向结果。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>干涉检查</h4>
+      <div class="overview-grid">
+        <div class="overview-row"><span>是否干涉</span><strong>${interference ? (interference.hasInterference ? "是" : "否") : "-"}</strong></div>
+        <div class="overview-row"><span>碰撞数量</span><strong>${interference?.collisionCount ?? 0}</strong></div>
+        <div class="overview-row"><span>总重叠量</span><strong>${formatNumber(interference?.totalOverlapVolume || 0)}</strong></div>
+      </div>
+      <div class="reasoning-list" style="margin-top: 12px;">
+        ${
+          interference?.collisions?.length
+            ? interference.collisions.map((item) => `
+                <div class="reasoning-item is-static">
+                  <strong>${escapeHtml(item.partName || item.partId)}</strong>
+                  <span>overlap ${formatNumber(item.overlapVolume)}</span>
+                </div>
+              `).join("")
+            : `<div class="inline-note">当前没有检测到干涉。</div>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function renderReasoningPlanPanel() {
+  const reasoning = state.workbench.reasoning;
+  const plan = reasoning.data.plan;
+  const sequences = plan?.candidateSequences || [];
+  const selectedSequence = getReasoningSequence();
+
+  return `
+    ${renderReasoningStatusNotice()}
+    <div class="panel-card">
+      <h4>候选序列</h4>
+      <div class="reasoning-list">
+        ${
+          sequences.length
+            ? sequences
+                .map(
+                  (sequence) => `
+                    <button class="reasoning-item ${sequence.sequenceId === reasoning.selection.sequenceId ? "is-active" : ""}" data-action="select-reasoning-sequence" data-sequence-id="${sequence.sequenceId}">
+                      <strong>${escapeHtml(sequence.sequenceId)} / ${escapeHtml(getPartDisplayName(sequence.basePartId))}</strong>
+                      <span>confidence ${formatConfidence(sequence.confidence)} / steps ${sequence.steps.length}</span>
+                    </button>
+                  `,
+                )
+                .join("")
+            : `<div class="inline-note">暂无装配序列。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>当前序列步骤</h4>
+      <div class="reasoning-list">
+        ${
+          selectedSequence?.steps?.length
+            ? selectedSequence.steps
+                .map(
+                  (step) => `
+                    <button class="reasoning-item ${step.stepIndex === reasoning.selection.stepIndex ? "is-active" : ""}" data-action="select-reasoning-step" data-sequence-id="${selectedSequence.sequenceId}" data-step-index="${step.stepIndex}">
+                      <strong>Step ${step.stepIndex}: ${escapeHtml(getPartDisplayName(step.assemblingPartId))}</strong>
+                      <span>base ${escapeHtml(getPartDisplayName(step.basePartId))} / ${formatConfidence(step.confidence)}</span>
+                    </button>
+                  `,
+                )
+                .join("")
+            : `<div class="inline-note">先选择一个序列查看步骤。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>Precedence 摘要</h4>
+      <div class="overview-grid">
+        <div class="overview-row"><span>节点数</span><strong>${plan?.precedenceGraph?.nodes?.length || 0}</strong></div>
+        <div class="overview-row"><span>边数</span><strong>${plan?.precedenceGraph?.edges?.length || 0}</strong></div>
+        <div class="overview-row"><span>当前基准件</span><strong>${escapeHtml(selectedSequence ? getPartDisplayName(selectedSequence.basePartId) : "-")}</strong></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderReasoningStepPanel() {
+  const reasoning = state.workbench.reasoning;
+  const explanation = reasoning.data.stepExplanation;
+  const preview = reasoning.data.stepPreview;
+
+  if (!explanation) {
+    return `
+      ${renderReasoningStatusNotice()}
+      <div class="panel-card">
+        <h4>尚未选择步骤</h4>
+        <p>先在“装配计划”里选择一个序列或步骤，这里会展示单步说明和预览。</p>
+      </div>
+    `;
+  }
+
+  return `
+    ${renderReasoningStatusNotice()}
+    <div class="panel-card">
+      <div class="panel-actions">
+        <h4>${escapeHtml(explanation.title)}</h4>
+        <button class="secondary-button" data-action="refresh-reasoning-step">刷新步骤</button>
+      </div>
+      <p>${escapeHtml(explanation.summary)}</p>
+      <div class="overview-grid" style="margin-top: 12px;">
+        <div class="overview-row"><span>基准件</span><strong>${escapeHtml(explanation.basePart.name)}</strong></div>
+        <div class="overview-row"><span>装配件</span><strong>${escapeHtml(explanation.assemblingPart.name)}</strong></div>
+        <div class="overview-row"><span>置信度</span><strong>${formatConfidence(explanation.confidence)}</strong></div>
+        <div class="overview-row"><span>插入方向</span><strong>${escapeHtml(formatVector(explanation.insertionAxis || { x: 0, y: 0, z: 0 }))}</strong></div>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>配合证据</h4>
+      <div class="reasoning-list">
+        ${
+          explanation.matingFaces?.length
+            ? explanation.matingFaces
+                .map((item) => {
+                  const isActive =
+                    reasoning.selection.highlightedBaseFaceId === item.baseFaceId &&
+                    reasoning.selection.highlightedAssemblingFaceId === item.partFaceId;
+                  return `
+                    <button
+                      class="reasoning-item ${isActive ? "is-active" : ""}"
+                      data-action="highlight-reasoning-mating-face"
+                      data-base-face-id="${item.baseFaceId}"
+                      data-assembling-face-id="${item.partFaceId}"
+                    >
+                      <strong>${escapeHtml(item.baseFaceName)} ↔ ${escapeHtml(item.assemblingFaceName)}</strong>
+                      <span>${escapeHtml(item.relation || "mate")}</span>
+                    </button>
+                  `;
+                })
+                .join("")
+            : `<div class="inline-note">当前步骤没有明确的配合面证据。</div>`
+        }
+      </div>
+      <div class="reasoning-list" style="margin-top: 12px;">
+        ${
+          explanation.evidence?.length
+            ? explanation.evidence.map((item) => `<div class="reasoning-item is-static"><strong>Evidence</strong><span>${escapeHtml(item)}</span></div>`).join("")
+            : `<div class="inline-note">暂无额外证据。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>步骤预览</h4>
+      ${preview?.dataUrl ? `<img class="reasoning-preview" alt="Step Preview" src="${preview.dataUrl}" />` : `<div class="inline-note">${escapeHtml(reasoning.data.stepPreviewError || "当前还没有生成步骤预览。")}</div>`}
+    </div>
+  `;
+}
 function renderOverviewPanel() {
   const { manifest, assembly } = state.activeProject;
   const meta = assembly?.meta || {};
@@ -851,7 +1534,7 @@ function renderOverviewPanel() {
       </div>
     </div>
     <div class="panel-card">
-      <h4>边界框与路线</h4>
+      <h4>边界尺寸</h4>
       <div class="overview-grid">
         <div class="overview-row"><span>X</span><strong>${formatNumber(state.activeProject.assembly.bounds.size.x)}</strong></div>
         <div class="overview-row"><span>Y</span><strong>${formatNumber(state.activeProject.assembly.bounds.size.y)}</strong></div>
@@ -920,19 +1603,18 @@ function renderTreeNode(nodeId) {
             ? `<span class="tree-badge">${node.stats?.partCount || 0}</span>`
             : `<span class="tree-badge">${formatNumber(maxDimension(node.bbox.size))}</span>`
         }
-        <button class="tree-visibility" data-action="toggle-visibility" data-node-id="${node.id}">${subtreeHidden ? "🙈" : "👁"}</button>
+        <button class="tree-visibility" data-action="toggle-visibility" data-node-id="${node.id}">${subtreeHidden ? "隐" : "显"}</button>
       </div>
       ${isAssembly && expanded ? childMarkup : ""}
     </div>
   `;
 }
-
 function renderDisplayPanel() {
   const selection = state.workbench.selection;
   const selectedLabel = selection ? getSelectionLabel() : "尚未选中对象";
   return `
     <div class="panel-card">
-      <h4>当前可见性</h4>
+      <h4>当前可见状态</h4>
       <div class="overview-grid">
         <div class="overview-row"><span>可见零件</span><strong>${getVisiblePartCount()}</strong></div>
         <div class="overview-row"><span>隐藏零件</span><strong>${state.activeProject.partNodes.length - getVisiblePartCount()}</strong></div>
@@ -951,7 +1633,7 @@ function renderDisplayPanel() {
     </div>
     <div class="panel-card">
       <h4>说明</h4>
-      <p>首版先实现显隐与隔离的状态管理，后续接入真实 CAD 内核时可把这层直接映射为模型实例可见性控制。</p>
+      <p>当前工作台通过显隐和隔离聚焦装配局部区域，后续可以继续映射到更真实的 CAD 内核显示控制。</p>
     </div>
   `;
 }
@@ -983,7 +1665,7 @@ function renderSectionPanel() {
           )
           .join("")}
       </div>
-      <p style="margin-top: 12px;">当前保留负向半空间，便于从外部向内部逐步切入。</p>
+      <p style="margin-top: 12px;">保留负向半空间，便于从外部向内部逐步切入。</p>
     </div>
     <div class="panel-card">
       <h4>剖切位置</h4>
@@ -1008,7 +1690,7 @@ function renderMeasurePanel() {
   const { measure, selectionMode } = state.workbench;
   const latestResult = measure.result;
   const picksText = measure.picks.length
-    ? measure.picks.map((pick) => getSelectionLabel(pick)).join("  →  ")
+    ? measure.picks.map((pick) => getSelectionLabel(pick)).join("  ->  ")
     : "尚未采样";
 
   return `
@@ -1123,7 +1805,6 @@ function renderPropertiesPanel() {
     </div>
   `;
 }
-
 function renderToasts() {
   if (!state.toasts.length) {
     return "";
@@ -1174,10 +1855,13 @@ function syncViewerState() {
     hiddenNodeIds: state.workbench.hiddenNodeIds,
     isolatedNodeIds: state.workbench.isolatedNodeIds,
     section: state.workbench.section,
+    reasoningOverlay:
+      state.workbench.workspaceMode === "reasoning"
+        ? state.workbench.reasoning.overlay
+        : createEmptyReasoningOverlay(),
   });
   state.viewer.setSelection(state.workbench.selection);
 }
-
 function updateViewerHint(message) {
   if (!state.workbench) {
     return;
@@ -1205,7 +1889,20 @@ async function handleClick(event) {
     return;
   }
 
-  const { action, projectId, nodeId, panel, preset, axis, mode } = actionTarget.dataset;
+  const {
+    action,
+    projectId,
+    nodeId,
+    panel,
+    preset,
+    axis,
+    mode,
+    workspaceMode,
+    basePartId,
+    assemblingPartId,
+    sequenceId,
+    stepIndex,
+  } = actionTarget.dataset;
 
   if (action !== "toggle-project-menu" && state.openProjectMenuId) {
     state.openProjectMenuId = null;
@@ -1239,12 +1936,42 @@ async function handleClick(event) {
     case "go-home":
       setRoute({ page: "home" });
       return;
+    case "set-workspace-mode":
+      if (!state.workbench) {
+        return;
+      }
+      state.workbench.workspaceMode = workspaceMode === "reasoning" ? "reasoning" : "model";
+      render();
+      if (state.workbench.workspaceMode === "reasoning") {
+        if (state.workbench.reasoning.status === "idle") {
+          await refreshReasoningData();
+        } else if (state.workbench.reasoningPanel === "transform") {
+          applyReasoningOverlay(state.workbench.reasoning.data.transformOverlay);
+          render();
+        } else if (state.workbench.reasoningPanel === "steps") {
+          applyReasoningMatingFaceHighlight(
+            state.workbench.reasoning.selection.highlightedBaseFaceId,
+            state.workbench.reasoning.selection.highlightedAssemblingFaceId,
+          );
+          render();
+        } else {
+          applyReasoningOverlay(state.workbench.reasoning.data.constraintsOverlay);
+          render();
+        }
+      } else {
+        applyReasoningOverlay(null);
+        render();
+      }
+      return;
+    case "refresh-reasoning":
+      await refreshReasoningData();
+      return;
     case "viewer-fit":
       state.viewer?.fit();
       return;
     case "viewer-preset":
       state.viewer?.setViewPreset(preset);
-      updateViewerHint(`切换到${actionTarget.textContent.trim()}`);
+      updateViewerHint(`切换到 ${actionTarget.textContent.trim()}`);
       return;
     case "toggle-selection-mode":
       state.workbench.selectionMode = state.workbench.selectionMode === "part" ? "face" : "part";
@@ -1267,6 +1994,50 @@ async function handleClick(event) {
     case "set-panel":
       state.workbench.activePanel = panel;
       render();
+      return;
+    case "set-reasoning-panel":
+      state.workbench.reasoningPanel = panel;
+      if (panel === "transform") {
+        applyReasoningOverlay(state.workbench.reasoning.data.transformOverlay);
+        if (!state.workbench.reasoning.data.relativeTransform) {
+          await loadReasoningTransform();
+          return;
+        }
+      } else if (panel === "steps") {
+        applyReasoningMatingFaceHighlight(
+          state.workbench.reasoning.selection.highlightedBaseFaceId,
+          state.workbench.reasoning.selection.highlightedAssemblingFaceId,
+        );
+        if (!state.workbench.reasoning.data.stepExplanation) {
+          await loadReasoningStep({ capturePreview: true });
+          return;
+        }
+      } else if (panel === "constraints") {
+        applyReasoningOverlay(state.workbench.reasoning.data.constraintsOverlay);
+      }
+      render();
+      return;
+    case "select-reasoning-base":
+      await selectReasoningBasePart(basePartId);
+      return;
+    case "select-reasoning-pair":
+      await selectReasoningPair(basePartId, assemblingPartId);
+      return;
+    case "select-reasoning-sequence":
+      await selectReasoningSequence(sequenceId);
+      return;
+    case "select-reasoning-step":
+      await selectReasoningStep(sequenceId, Number(stepIndex));
+      return;
+    case "highlight-reasoning-mating-face":
+      applyReasoningMatingFaceHighlight(baseFaceId, assemblingFaceId);
+      render();
+      return;
+    case "refresh-reasoning-transform":
+      await loadReasoningTransform();
+      return;
+    case "refresh-reasoning-step":
+      await loadReasoningStep();
       return;
     case "toggle-node":
       toggleExpandedNode(nodeId);
@@ -1311,7 +2082,6 @@ async function handleClick(event) {
       break;
   }
 }
-
 function handleInput(event) {
   const target = event.target;
   const bind = target.dataset.bind;
@@ -1398,7 +2168,6 @@ async function importFiles(filePaths) {
     pushToast("导入失败，请检查文件格式。", "error");
   }
 }
-
 async function handleRenameProject(projectId) {
   const current = state.projects.find((project) => project.projectId === projectId) || state.activeProject?.manifest;
   const nextName = window.prompt("输入新的项目名称：", current?.projectName || "");
@@ -1618,7 +2387,7 @@ function computeDistanceMeasurement(leftSelection, rightSelection) {
   const distance = Math.sqrt(dx ** 2 + dy ** 2 + dz ** 2);
 
   return {
-    label: `距离：${getSelectionLabel(leftSelection)} → ${getSelectionLabel(rightSelection)}`,
+    label: `距离：${getSelectionLabel(leftSelection)} -> ${getSelectionLabel(rightSelection)}`,
     value: `${formatNumber(distance)} mm`,
   };
 }
@@ -1641,7 +2410,7 @@ function computeAngleMeasurement(leftSelection, rightSelection) {
   const degrees = (radians * 180) / Math.PI;
 
   return {
-    label: `角度：${getSelectionLabel(leftSelection)} ↔ ${getSelectionLabel(rightSelection)}`,
+    label: `角度：${getSelectionLabel(leftSelection)} -> ${getSelectionLabel(rightSelection)}`,
     value: `${formatNumber(degrees)}°`,
   };
 }
@@ -1667,7 +2436,6 @@ function computeEdgeMeasurement(selection) {
     value: `${formatNumber(maxDimension(node.bbox.size))} mm`,
   };
 }
-
 function getSelectionAnchor(selection) {
   if (selection?.point) {
     return selection.point;
@@ -1778,7 +2546,16 @@ function measureModeLabel(mode) {
     edge: "边长",
   }[mode];
 }
+function formatConfidence(value) {
+  return `${Math.round((Number(value) || 0) * 100)}%`;
+}
 
+function formatQuaternion(quaternion) {
+  if (!quaternion) {
+    return "-";
+  }
+  return `${formatNumber(quaternion.x)} / ${formatNumber(quaternion.y)} / ${formatNumber(quaternion.z)} / ${formatNumber(quaternion.w)}`;
+}
 function formatBytes(value) {
   if (!value && value !== 0) {
     return "-";
@@ -1941,3 +2718,49 @@ async function handleWindowDrop(event) {
     await importFiles(filePaths);
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

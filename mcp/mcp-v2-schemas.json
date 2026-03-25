@@ -1,0 +1,443 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.step-workbench/mcp-v2-schemas.json",
+  "title": "STEP Workbench MCP V2 Schema Bundle",
+  "type": "object",
+  "$defs": {
+    "Point3": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      },
+      "required": ["x", "y", "z"],
+      "additionalProperties": false
+    },
+    "Quaternion": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" },
+        "w": { "type": "number" }
+      },
+      "required": ["x", "y", "z", "w"],
+      "additionalProperties": false
+    },
+    "Transform": {
+      "type": "object",
+      "properties": {
+        "translation": { "$ref": "#/$defs/Point3" },
+        "quaternion": { "$ref": "#/$defs/Quaternion" }
+      },
+      "additionalProperties": false
+    },
+    "FacePairCandidate": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "partAId": { "type": "string" },
+        "partBId": { "type": "string" },
+        "faceAId": { "type": "string" },
+        "faceBId": { "type": "string" },
+        "relation": { "type": "string" },
+        "normalAlignment": { "type": "number" },
+        "gap": { "type": "number" },
+        "overlapScore": { "type": "number" },
+        "areaScore": { "type": "number" },
+        "score": { "type": "number" },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["id", "partAId", "partBId", "faceAId", "faceBId", "relation", "score"],
+      "additionalProperties": true
+    },
+    "BasePartCandidate": {
+      "type": "object",
+      "properties": {
+        "partId": { "type": "string" },
+        "name": { "type": "string" },
+        "score": { "type": "number" },
+        "volumeScore": { "type": "number" },
+        "supportAreaScore": { "type": "number" },
+        "connectivityScore": { "type": "number" },
+        "centerBias": { "type": "number" },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["partId", "name", "score"],
+      "additionalProperties": false
+    },
+    "MatingPair": {
+      "type": "object",
+      "properties": {
+        "pairId": { "type": "string" },
+        "partAId": { "type": "string" },
+        "partAName": { "type": "string" },
+        "partBId": { "type": "string" },
+        "partBName": { "type": "string" },
+        "score": { "type": "number" },
+        "bboxGap": { "type": "number" },
+        "candidateFaces": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FacePairCandidate" }
+        }
+      },
+      "required": ["pairId", "partAId", "partBId", "score"],
+      "additionalProperties": true
+    },
+    "InsertionCandidate": {
+      "type": "object",
+      "properties": {
+        "candidateId": { "type": "string" },
+        "partId": { "type": "string" },
+        "basePartId": { "type": "string" },
+        "movingFaceId": { "type": "string" },
+        "baseFaceId": { "type": "string" },
+        "insertionAxis": { "$ref": "#/$defs/Point3" },
+        "travelDistance": { "type": "number" },
+        "score": { "type": "number" },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["candidateId", "partId", "basePartId", "insertionAxis", "travelDistance", "score"],
+      "additionalProperties": true
+    },
+    "InterferenceCollision": {
+      "type": "object",
+      "properties": {
+        "partId": { "type": "string" },
+        "name": { "type": "string" },
+        "overlapVolume": { "type": "number" },
+        "intersects": { "type": "boolean" }
+      },
+      "required": ["partId", "overlapVolume", "intersects"],
+      "additionalProperties": false
+    },
+    "SequenceStep": {
+      "type": "object",
+      "properties": {
+        "stepIndex": { "type": "integer", "minimum": 1 },
+        "basePartId": { "type": "string" },
+        "assemblingPartId": { "type": "string" },
+        "transformBefore": { "$ref": "#/$defs/Transform" },
+        "transformAfter": { "$ref": "#/$defs/Transform" },
+        "deltaTransform": { "$ref": "#/$defs/Transform" },
+        "matingFaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "baseFaceId": { "type": "string" },
+              "partFaceId": { "type": "string" },
+              "relation": { "type": "string" }
+            },
+            "required": ["baseFaceId", "partFaceId", "relation"],
+            "additionalProperties": false
+          }
+        },
+        "insertionAxis": { "$ref": "#/$defs/Point3" },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "confidence": { "type": "number" }
+      },
+      "required": ["stepIndex", "basePartId", "assemblingPartId"],
+      "additionalProperties": true
+    },
+    "SequenceExplanation": {
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "sequenceId": { "type": "string" },
+        "stepIndex": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "rationale": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "basePart": {
+          "type": "object",
+          "properties": {
+            "partId": { "type": "string" },
+            "name": { "type": "string" }
+          },
+          "required": ["partId", "name"],
+          "additionalProperties": false
+        },
+        "assemblingPart": {
+          "type": "object",
+          "properties": {
+            "partId": { "type": "string" },
+            "name": { "type": "string" }
+          },
+          "required": ["partId", "name"],
+          "additionalProperties": false
+        },
+        "insertionAxis": { "$ref": "#/$defs/Point3" },
+        "matingFaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "baseFaceId": { "type": "string" },
+              "partFaceId": { "type": "string" },
+              "relation": { "type": "string" }
+            },
+            "required": ["baseFaceId", "partFaceId", "relation"],
+            "additionalProperties": false
+          }
+        },
+        "deltaTransform": { "$ref": "#/$defs/Transform" },
+        "transformBefore": { "$ref": "#/$defs/Transform" },
+        "transformAfter": { "$ref": "#/$defs/Transform" },
+        "confidence": { "type": "number" },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["projectId", "sequenceId", "stepIndex", "title", "summary", "basePart", "assemblingPart"],
+      "additionalProperties": true
+    },
+    "ToolInputs": {
+      "type": "object",
+      "properties": {
+        "getBasePartCandidates": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "topK": { "type": "integer", "minimum": 1, "maximum": 20 }
+          },
+          "additionalProperties": false
+        },
+        "getMatingCandidates": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "partIds": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "topK": { "type": "integer", "minimum": 1, "maximum": 128 },
+            "facePairLimit": { "type": "integer", "minimum": 1, "maximum": 10 }
+          },
+          "additionalProperties": false
+        },
+        "getRelativeTransform": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "fromPartId": { "type": "string" },
+            "toPartId": { "type": "string" }
+          },
+          "required": ["fromPartId", "toPartId"],
+          "additionalProperties": false
+        },
+        "getInsertionCandidates": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "partId": { "type": "string" },
+            "referencePartId": { "type": "string" },
+            "topK": { "type": "integer", "minimum": 1, "maximum": 16 }
+          },
+          "required": ["partId"],
+          "additionalProperties": false
+        },
+        "checkInterference": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "movingPartId": { "type": "string" },
+            "fixedPartIds": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "transform": { "$ref": "#/$defs/Transform" }
+          },
+          "required": ["movingPartId"],
+          "additionalProperties": false
+        },
+        "planSequence": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "rootAssemblyId": { "type": "string" },
+            "strategy": { "type": "string" },
+            "basePartId": { "type": "string" },
+            "maxSequences": { "type": "integer", "minimum": 1, "maximum": 10 }
+          },
+          "additionalProperties": false
+        },
+        "explainStep": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "sequenceId": { "type": "string" },
+            "stepIndex": { "type": "integer", "minimum": 1 },
+            "rootAssemblyId": { "type": "string" },
+            "strategy": { "type": "string" },
+            "basePartId": { "type": "string" },
+            "maxSequences": { "type": "integer", "minimum": 1, "maximum": 10 }
+          },
+          "additionalProperties": false
+        },
+        "captureStepPreview": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "sequenceId": { "type": "string" },
+            "stepIndex": { "type": "integer", "minimum": 1 },
+            "rootAssemblyId": { "type": "string" },
+            "strategy": { "type": "string" },
+            "basePartId": { "type": "string" },
+            "maxSequences": { "type": "integer", "minimum": 1, "maximum": 10 },
+            "width": { "type": "integer", "minimum": 64, "maximum": 4096 },
+            "height": { "type": "integer", "minimum": 64, "maximum": 4096 },
+            "fit": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolOutputs": {
+      "type": "object",
+      "properties": {
+        "getBasePartCandidates": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string" },
+            "candidates": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/BasePartCandidate" }
+            }
+          },
+          "required": ["projectId", "candidates"],
+          "additionalProperties": false
+        },
+        "getMatingCandidates": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string" },
+            "candidates": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/MatingPair" }
+            }
+          },
+          "required": ["projectId", "candidates"],
+          "additionalProperties": false
+        },
+        "getRelativeTransform": { "$ref": "#/$defs/Transform" },
+        "getInsertionCandidates": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string" },
+            "partId": { "type": "string" },
+            "candidates": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/InsertionCandidate" }
+            }
+          },
+          "required": ["projectId", "partId", "candidates"],
+          "additionalProperties": false
+        },
+        "checkInterference": {
+          "type": "object",
+          "properties": {
+            "movingPartId": { "type": "string" },
+            "method": { "type": "string" },
+            "hasInterference": { "type": "boolean" },
+            "collisionCount": { "type": "integer" },
+            "totalOverlapVolume": { "type": "number" },
+            "collisions": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/InterferenceCollision" }
+            }
+          },
+          "required": ["movingPartId", "method", "hasInterference", "collisionCount", "collisions"],
+          "additionalProperties": true
+        },
+        "planSequence": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string" },
+            "rootAssemblyId": { "type": "string" },
+            "basePartCandidates": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/BasePartCandidate" }
+            },
+            "precedenceGraph": {
+              "type": "object",
+              "properties": {
+                "nodes": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "edges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "from": { "type": "string" },
+                      "to": { "type": "string" },
+                      "reason": { "type": "string" }
+                    },
+                    "required": ["from", "to", "reason"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["nodes", "edges"],
+              "additionalProperties": false
+            },
+            "candidateSequences": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "sequenceId": { "type": "string" },
+                  "basePartId": { "type": "string" },
+                  "confidence": { "type": "number" },
+                  "steps": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/SequenceStep" }
+                  }
+                },
+                "required": ["sequenceId", "basePartId", "steps"],
+                "additionalProperties": true
+              }
+            }
+          },
+          "required": ["projectId", "rootAssemblyId", "basePartCandidates", "precedenceGraph", "candidateSequences"],
+          "additionalProperties": false
+        },
+        "explainStep": { "$ref": "#/$defs/SequenceExplanation" },
+        "captureStepPreview": {
+          "type": "object",
+          "properties": {
+            "resourceUri": { "type": "string" },
+            "mimeType": { "type": "string" },
+            "width": { "type": "integer" },
+            "height": { "type": "integer" },
+            "sequenceId": { "type": "string" },
+            "stepIndex": { "type": "integer" }
+          },
+          "required": ["resourceUri", "mimeType", "width", "height", "sequenceId", "stepIndex"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

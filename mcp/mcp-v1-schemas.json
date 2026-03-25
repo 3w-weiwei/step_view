@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.step-workbench/mcp-v1-schemas.json",
+  "title": "STEP Workbench MCP V1 Schema Bundle",
+  "type": "object",
+  "$defs": {
+    "ProjectRef": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Point3": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      },
+      "required": ["x", "y", "z"],
+      "additionalProperties": false
+    },
+    "BoundingBox": {
+      "type": "object",
+      "properties": {
+        "min": { "$ref": "#/$defs/Point3" },
+        "max": { "$ref": "#/$defs/Point3" },
+        "center": { "$ref": "#/$defs/Point3" },
+        "size": { "$ref": "#/$defs/Point3" }
+      },
+      "required": ["min", "max", "center", "size"],
+      "additionalProperties": false
+    },
+    "SelectionRef": {
+      "type": "object",
+      "properties": {
+        "nodeId": { "type": "string" },
+        "faceId": { "type": "string" },
+        "meshId": { "type": "string" },
+        "point": { "$ref": "#/$defs/Point3" }
+      },
+      "additionalProperties": false
+    },
+    "CameraState": {
+      "type": "object",
+      "properties": {
+        "position": { "$ref": "#/$defs/Point3" },
+        "target": { "$ref": "#/$defs/Point3" },
+        "up": { "$ref": "#/$defs/Point3" },
+        "fov": { "type": "number" }
+      },
+      "required": ["position", "target"],
+      "additionalProperties": false
+    },
+    "SectionState": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "axis": { "type": "string", "enum": ["x", "y", "z"] },
+        "offset": { "type": "number" }
+      },
+      "required": ["enabled"],
+      "additionalProperties": false
+    },
+    "ColorMapEntry": {
+      "type": "object",
+      "properties": {
+        "colorHex": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "nodeId": { "type": "string" },
+        "partId": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["colorHex", "nodeId", "name"],
+      "additionalProperties": false
+    },
+    "TopologySummary": {
+      "type": "object",
+      "properties": {
+        "faceCount": { "type": "integer", "minimum": 0 },
+        "solidCount": { "type": "integer", "minimum": 0 },
+        "meshCount": { "type": "integer", "minimum": 0 },
+        "triangleCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "AssemblyNode": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "kind": { "type": "string", "enum": ["assembly", "part"] },
+        "pathNames": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "meshRefs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "bbox": { "$ref": "#/$defs/BoundingBox" },
+        "topology": { "$ref": "#/$defs/TopologySummary" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AssemblyNode" }
+        }
+      },
+      "required": ["id", "name", "kind"],
+      "additionalProperties": true
+    },
+    "AssemblySummary": {
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "format": "uuid" },
+        "projectName": { "type": "string" },
+        "modelName": { "type": "string" },
+        "status": { "type": "string" },
+        "parserMode": { "type": "string" },
+        "geometryMode": { "type": "string" },
+        "partCount": { "type": "integer", "minimum": 0 },
+        "assemblyCount": { "type": "integer", "minimum": 0 },
+        "faceCount": { "type": "integer", "minimum": 0 },
+        "solidCount": { "type": "integer", "minimum": 0 },
+        "selection": { "$ref": "#/$defs/SelectionRef" },
+        "section": { "$ref": "#/$defs/SectionState" },
+        "camera": { "$ref": "#/$defs/CameraState" }
+      },
+      "required": ["projectId", "projectName", "status"],
+      "additionalProperties": true
+    },
+    "CaptureArtifact": {
+      "type": "object",
+      "properties": {
+        "resourceUri": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "sha256": { "type": "string" }
+      },
+      "required": ["resourceUri", "mimeType", "width", "height"],
+      "additionalProperties": false
+    },
+    "MeasureResult": {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "enum": ["distance", "angle"] },
+        "value": { "type": "number" },
+        "unit": { "type": "string" },
+        "from": { "$ref": "#/$defs/SelectionRef" },
+        "to": { "$ref": "#/$defs/SelectionRef" }
+      },
+      "required": ["kind", "value", "unit"],
+      "additionalProperties": true
+    },
+    "ToolInputs": {
+      "type": "object",
+      "properties": {
+        "getCurrentSummary": {
+          "type": "object",
+          "additionalProperties": false
+        },
+        "getTree": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "maxDepth": { "type": "integer", "minimum": 1 },
+            "includeMeshRefs": { "type": "boolean" },
+            "includeHidden": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "getPart": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "partId": { "type": "string" }
+          },
+          "required": ["partId"],
+          "additionalProperties": false
+        },
+        "getColorMap": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "mode": { "type": "string", "enum": ["display", "id-mask"] }
+          },
+          "additionalProperties": false
+        },
+        "captureView": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "width": { "type": "integer", "minimum": 64, "maximum": 4096 },
+            "height": { "type": "integer", "minimum": 64, "maximum": 4096 },
+            "fit": { "type": "boolean" },
+            "background": { "type": "string", "enum": ["transparent", "solid", "current"] }
+          },
+          "additionalProperties": false
+        },
+        "capturePartMask": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "width": { "type": "integer", "minimum": 64, "maximum": 4096 },
+            "height": { "type": "integer", "minimum": 64, "maximum": 4096 },
+            "fit": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "isolateParts": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "partIds": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          },
+          "required": ["partIds"],
+          "additionalProperties": false
+        },
+        "setSectionPlane": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "axis": { "type": "string", "enum": ["x", "y", "z"] },
+            "offset": { "type": "number" },
+            "enabled": { "type": "boolean" }
+          },
+          "required": ["axis", "offset"],
+          "additionalProperties": false
+        },
+        "measureDistance": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "from": { "$ref": "#/$defs/SelectionRef" },
+            "to": { "$ref": "#/$defs/SelectionRef" }
+          },
+          "required": ["from", "to"],
+          "additionalProperties": false
+        },
+        "measureAngle": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string", "format": "uuid" },
+            "faceAId": { "type": "string" },
+            "faceBId": { "type": "string" }
+          },
+          "required": ["faceAId", "faceBId"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolOutputs": {
+      "type": "object",
+      "properties": {
+        "getCurrentSummary": { "$ref": "#/$defs/AssemblySummary" },
+        "getTree": { "$ref": "#/$defs/AssemblyNode" },
+        "getPart": { "$ref": "#/$defs/AssemblyNode" },
+        "getColorMap": {
+          "type": "object",
+          "properties": {
+            "entries": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/ColorMapEntry" }
+            }
+          },
+          "required": ["entries"],
+          "additionalProperties": false
+        },
+        "captureView": { "$ref": "#/$defs/CaptureArtifact" },
+        "capturePartMask": { "$ref": "#/$defs/CaptureArtifact" },
+        "measureDistance": { "$ref": "#/$defs/MeasureResult" },
+        "measureAngle": { "$ref": "#/$defs/MeasureResult" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

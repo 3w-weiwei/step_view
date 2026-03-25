@@ -1,4 +1,4 @@
-import * as THREE from "three";
+﻿import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const VIEW_DIRECTIONS = {
@@ -48,6 +48,33 @@ function unionBounds(boundsList) {
   };
 }
 
+function toVector3(vector = { x: 0, y: 0, z: 0 }) {
+  return new THREE.Vector3(vector.x || 0, vector.y || 0, vector.z || 0);
+}
+
+function createReasoningOverlayState() {
+  return {
+    focusPartIds: [],
+    basePartId: null,
+    assemblingPartId: null,
+    baseFaceIds: [],
+    assemblingFaceIds: [],
+    insertionAxis: null,
+    interferenceBoxes: [],
+  };
+}
+
+function disposeObjectTree(object) {
+  object.traverse((child) => {
+    if (child.geometry) {
+      child.geometry.dispose();
+    }
+    if (child.material) {
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((material) => material?.dispose?.());
+    }
+  });
+}
 function triangleRangeContains(face, triangleIndex) {
   return triangleIndex >= face.triangleFirst && triangleIndex <= face.triangleLast;
 }
@@ -61,6 +88,11 @@ function createMaterial(color) {
   });
 }
 
+function indexToMaskHex(index) {
+  const value = index + 1;
+  return `#${value.toString(16).padStart(6, "0")}`;
+}
+
 export class WorkbenchViewer {
   constructor({ canvas, onObjectPick, onHintChange }) {
     this.canvas = canvas;
@@ -69,6 +101,7 @@ export class WorkbenchViewer {
     this.sceneData = null;
     this.meshRecords = new Map();
     this.nodeMap = new Map();
+    this.nodeMaskColors = new Map();
     this.hovered = null;
     this.selection = null;
     this.state = {
@@ -80,6 +113,7 @@ export class WorkbenchViewer {
         axis: "x",
         offset: 0,
       },
+      reasoningOverlay: createReasoningOverlayState(),
     };
 
     this.renderer = new THREE.WebGLRenderer({
@@ -106,6 +140,9 @@ export class WorkbenchViewer {
 
     this.rootGroup = new THREE.Group();
     this.scene.add(this.rootGroup);
+
+    this.reasoningOverlayGroup = new THREE.Group();
+    this.scene.add(this.reasoningOverlayGroup);
 
     this.sectionPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
     this.raycaster = new THREE.Raycaster();
@@ -186,6 +223,7 @@ export class WorkbenchViewer {
     }
     this.controls.dispose();
     this.disposeSceneObjects();
+    this.clearReasoningOverlay();
     this.renderer.dispose();
   }
 
@@ -356,7 +394,14 @@ export class WorkbenchViewer {
   setScene(sceneData, { preserveCamera = false } = {}) {
     this.sceneData = sceneData;
     this.nodeMap = new Map(sceneData.nodes.map((node) => [node.id, node]));
+    this.nodeMaskColors = new Map();
     this.disposeSceneObjects();
+
+    sceneData.nodes
+      .filter((node) => node.kind === "part")
+      .forEach((node, index) => {
+        this.nodeMaskColors.set(node.id, indexToMaskHex(index));
+      });
 
     sceneData.meshes.forEach((meshData) => {
       const geometry = new THREE.BufferGeometry();
@@ -390,6 +435,7 @@ export class WorkbenchViewer {
         edges,
         meshData,
         node: this.nodeMap.get(meshData.nodeId),
+        maskColorHex: this.nodeMaskColors.get(meshData.nodeId) || "#000001",
         baseColors: (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((material) =>
           material.color.clone(),
         ),
@@ -415,6 +461,42 @@ export class WorkbenchViewer {
     this.sectionPlane.set(axis, -this.state.section.offset);
   }
 
+  clearReasoningOverlay() {
+    while (this.reasoningOverlayGroup.children.length) {
+      const child = this.reasoningOverlayGroup.children[0];
+      this.reasoningOverlayGroup.remove(child);
+      disposeObjectTree(child);
+    }
+  }
+
+  renderReasoningOverlay() {
+    this.clearReasoningOverlay();
+
+    const overlay = this.state.reasoningOverlay || createReasoningOverlayState();
+    if (overlay.insertionAxis) {
+      const origin = toVector3(overlay.insertionAxis.origin || { x: 0, y: 0, z: 0 });
+      const direction = toVector3(overlay.insertionAxis.direction || { x: 0, y: 0, z: 1 }).normalize();
+      const length = Math.max(overlay.insertionAxis.length || 12, 12);
+      const arrow = new THREE.ArrowHelper(direction, origin, length, 0x37d4c9, Math.min(length * 0.16, 16), Math.min(length * 0.1, 8));
+      this.reasoningOverlayGroup.add(arrow);
+
+      const anchor = new THREE.Mesh(
+        new THREE.SphereGeometry(Math.max(length * 0.02, 1.8), 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0x37d4c9 }),
+      );
+      anchor.position.copy(origin);
+      this.reasoningOverlayGroup.add(anchor);
+    }
+
+    (overlay.interferenceBoxes || []).forEach((item) => {
+      if (!item?.bbox) {
+        return;
+      }
+      const helper = new THREE.Box3Helper(boxFromBounds(item.bbox), new THREE.Color(0xff6b6b));
+      this.reasoningOverlayGroup.add(helper);
+    });
+  }
+
   updateState(partialState) {
     this.state = {
       ...this.state,
@@ -426,6 +508,13 @@ export class WorkbenchViewer {
         ...this.state.section,
         ...(partialState.section || {}),
       },
+      reasoningOverlay:
+        partialState.reasoningOverlay === undefined
+          ? this.state.reasoningOverlay
+          : {
+              ...createReasoningOverlayState(),
+              ...(partialState.reasoningOverlay || {}),
+            },
     };
     this.updateSectionPlane();
     this.applyVisualState();
@@ -437,6 +526,11 @@ export class WorkbenchViewer {
   }
 
   applyVisualState() {
+    const overlay = this.state.reasoningOverlay || createReasoningOverlayState();
+    const focusSet = new Set(overlay.focusPartIds || []);
+    const baseFaceSet = new Set(overlay.baseFaceIds || []);
+    const assemblingFaceSet = new Set(overlay.assemblingFaceIds || []);
+
     this.meshRecords.forEach((record) => {
       const visibleByHidden = !this.state.hiddenNodeIds.has(record.meshData.nodeId);
       const visibleByIsolation =
@@ -453,6 +547,27 @@ export class WorkbenchViewer {
         material.clippingPlanes = this.state.section.enabled ? [this.sectionPlane] : [];
         material.clipShadows = true;
       });
+      record.edges.material.color.set(0x263244);
+      record.edges.material.opacity = 0.35;
+
+      if (focusSet.size && !focusSet.has(record.meshData.nodeId)) {
+        materials.forEach((material) => {
+          material.transparent = true;
+          material.opacity = 0.16;
+        });
+        record.edges.material.opacity = 0.08;
+      }
+
+      const isBasePart = overlay.basePartId === record.meshData.nodeId;
+      const isAssemblingPart = overlay.assemblingPartId === record.meshData.nodeId;
+      if (isBasePart || isAssemblingPart) {
+        materials.forEach((material) => {
+          material.emissive = new THREE.Color(isBasePart ? 0x2c66c8 : 0x885200);
+          material.emissiveIntensity = isBasePart ? 0.32 : 0.28;
+        });
+        record.edges.material.color.set(isBasePart ? 0x4eb4ff : 0xffc06d);
+        record.edges.material.opacity = 0.9;
+      }
 
       const isSelectedPart =
         this.selection && this.selection.selectionType !== "face" && this.selection.nodeId === record.meshData.nodeId;
@@ -474,6 +589,15 @@ export class WorkbenchViewer {
         if (!material) {
           return;
         }
+        if (baseFaceSet.has(face.id)) {
+          material.color.set(0x52b5ff);
+          material.emissive = new THREE.Color(0x173764);
+          material.emissiveIntensity = 0.42;
+        } else if (assemblingFaceSet.has(face.id)) {
+          material.color.set(0xffbf4d);
+          material.emissive = new THREE.Color(0x6a4600);
+          material.emissiveIntensity = 0.38;
+        }
         if (selectedFaceId === face.id) {
           material.color.set(0xf0b13f);
           material.emissive = new THREE.Color(0x7f5300);
@@ -486,9 +610,9 @@ export class WorkbenchViewer {
       });
     });
 
+    this.renderReasoningOverlay();
     this.render();
   }
-
   fit() {
     const bounds = this.sceneData?.bounds;
     if (!bounds) {
@@ -523,4 +647,260 @@ export class WorkbenchViewer {
     this.controls.update();
     this.render();
   }
+
+  getColorMap(mode = "display") {
+    if (!this.sceneData) {
+      return [];
+    }
+
+    return this.sceneData.nodes
+      .filter((node) => node.kind === "part")
+      .map((node) => {
+        const firstMeshId = node.meshRefs?.[0];
+        const record = firstMeshId ? this.meshRecords.get(firstMeshId) : null;
+        return {
+          nodeId: node.id,
+          partId: node.id,
+          name: node.name,
+          colorHex:
+            mode === "id-mask"
+              ? this.nodeMaskColors.get(node.id) || "#000001"
+              : record?.meshData?.color || node.color || "#8aa6d1",
+          visible: Boolean(record?.mesh?.visible),
+        };
+      });
+  }
+
+  getMeshRecordsForNode(nodeId) {
+    return [...this.meshRecords.values()].filter((record) => record.meshData.nodeId === nodeId);
+  }
+
+  applyNodeTranslationDelta(nodeId, delta) {
+    this.getMeshRecordsForNode(nodeId).forEach((record) => {
+      record.mesh.position.set(delta.x, delta.y, delta.z);
+      record.edges.position.set(delta.x, delta.y, delta.z);
+    });
+  }
+
+  async composeComparisonImage(beforeDataUrl, afterDataUrl, width, height, labels = ["Before", "After"]) {
+    const loadImage = (src) =>
+      new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = src;
+      });
+
+    const [beforeImage, afterImage] = await Promise.all([loadImage(beforeDataUrl), loadImage(afterDataUrl)]);
+    const canvas = document.createElement("canvas");
+    canvas.width = width * 2;
+    canvas.height = height + 44;
+    const context = canvas.getContext("2d");
+
+    context.fillStyle = "#0f1622";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.drawImage(beforeImage, 0, 0, width, height);
+    context.drawImage(afterImage, width, 0, width, height);
+
+    context.fillStyle = "rgba(255,255,255,0.9)";
+    context.font = '600 18px "Segoe UI", "Microsoft YaHei", sans-serif';
+    context.fillText(labels[0], 18, height + 28);
+    context.fillText(labels[1], width + 18, height + 28);
+
+    context.strokeStyle = "rgba(255,255,255,0.08)";
+    context.beginPath();
+    context.moveTo(width, 0);
+    context.lineTo(width, canvas.height);
+    context.stroke();
+
+    return canvas.toDataURL("image/png");
+  }
+
+  capture(mode = "beauty", options = {}) {
+    if (!this.sceneData) {
+      throw new Error("当前没有可捕获的装配体。");
+    }
+
+    const previousSize = new THREE.Vector2();
+    this.renderer.getSize(previousSize);
+    const previousAspect = this.camera.aspect;
+    const targetWidth = Math.max(1, options.width || previousSize.x || this.canvas.width || 1);
+    const targetHeight = Math.max(1, options.height || previousSize.y || this.canvas.height || 1);
+
+    if (options.fit) {
+      this.fit();
+    }
+
+    this.renderer.setSize(targetWidth, targetHeight, false);
+    this.camera.aspect = targetWidth / targetHeight;
+    this.camera.updateProjectionMatrix();
+
+    let dataUrl;
+    if (mode === "id-mask") {
+      dataUrl = this.captureMaskFrame();
+    } else {
+      this.render();
+      dataUrl = this.canvas.toDataURL("image/png");
+    }
+
+    this.renderer.setSize(previousSize.x, previousSize.y, false);
+    this.camera.aspect = previousAspect;
+    this.camera.updateProjectionMatrix();
+    this.render();
+
+    return {
+      dataUrl,
+      mimeType: "image/png",
+      width: targetWidth,
+      height: targetHeight,
+      colorMap: this.getColorMap(mode === "id-mask" ? "id-mask" : "display"),
+    };
+  }
+
+  async captureStepPreview(step, options = {}) {
+    if (!step) {
+      throw new Error("缺少装配步骤数据。");
+    }
+
+    const previousSize = new THREE.Vector2();
+    this.renderer.getSize(previousSize);
+    const previousAspect = this.camera.aspect;
+    const width = Math.max(1, options.width || previousSize.x || this.canvas.width || 1);
+    const height = Math.max(1, options.height || previousSize.y || this.canvas.height || 1);
+
+    const visibilitySnapshot = [...this.meshRecords.values()].map((record) => ({
+      record,
+      meshVisible: record.mesh.visible,
+      edgesVisible: record.edges.visible,
+      meshPosition: record.mesh.position.clone(),
+      edgePosition: record.edges.position.clone(),
+    }));
+
+    const focusNodeIds = new Set([step.basePart.partId, step.assemblingPart.partId]);
+    this.meshRecords.forEach((record) => {
+      const visible = focusNodeIds.has(record.meshData.nodeId);
+      record.mesh.visible = visible;
+      record.edges.visible = visible;
+    });
+
+    if (options.fit !== false) {
+      this.fit();
+    }
+
+    this.renderer.setSize(width, height, false);
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+
+    const delta = step.transformBefore?.translation && step.transformAfter?.translation
+      ? {
+          x: step.transformBefore.translation.x - step.transformAfter.translation.x,
+          y: step.transformBefore.translation.y - step.transformAfter.translation.y,
+          z: step.transformBefore.translation.z - step.transformAfter.translation.z,
+        }
+      : {
+          x: -(step.deltaTransform?.translation?.x || 0),
+          y: -(step.deltaTransform?.translation?.y || 0),
+          z: -(step.deltaTransform?.translation?.z || 0),
+        };
+
+    this.applyNodeTranslationDelta(step.assemblingPart.partId, delta);
+    this.render();
+    const beforeDataUrl = this.canvas.toDataURL("image/png");
+
+    this.applyNodeTranslationDelta(step.assemblingPart.partId, { x: 0, y: 0, z: 0 });
+    this.render();
+    const afterDataUrl = this.canvas.toDataURL("image/png");
+
+    const compositeDataUrl = await this.composeComparisonImage(beforeDataUrl, afterDataUrl, width, height);
+
+    visibilitySnapshot.forEach((snapshot) => {
+      snapshot.record.mesh.visible = snapshot.meshVisible;
+      snapshot.record.edges.visible = snapshot.edgesVisible;
+      snapshot.record.mesh.position.copy(snapshot.meshPosition);
+      snapshot.record.edges.position.copy(snapshot.edgePosition);
+    });
+
+    this.renderer.setSize(previousSize.x, previousSize.y, false);
+    this.camera.aspect = previousAspect;
+    this.camera.updateProjectionMatrix();
+    this.applyVisualState();
+
+    return {
+      dataUrl: compositeDataUrl,
+      beforeDataUrl,
+      afterDataUrl,
+      mimeType: "image/png",
+      width: width * 2,
+      height: height + 44,
+      labels: ["Before", "After"],
+    };
+  }
+
+  captureMaskFrame() {
+    const previousBackground = this.scene.background;
+    this.scene.background = new THREE.Color(0x000000);
+    this.grid.visible = false;
+    this.axes.visible = false;
+
+    const restoreEntries = [];
+    this.meshRecords.forEach((record) => {
+      const materials = Array.isArray(record.mesh.material) ? record.mesh.material : [record.mesh.material];
+      restoreEntries.push({
+        record,
+        edgeVisible: record.edges.visible,
+        materialState: materials.map((material) => ({
+          color: material.color.clone(),
+          emissive: material.emissive?.clone?.() || new THREE.Color(0x000000),
+          emissiveIntensity: material.emissiveIntensity || 0,
+          transparent: material.transparent,
+          opacity: material.opacity,
+        })),
+      });
+
+      const maskColor = new THREE.Color(record.maskColorHex);
+      materials.forEach((material) => {
+        material.color.copy(maskColor);
+        if (material.emissive) {
+          material.emissive.set(0x000000);
+          material.emissiveIntensity = 0;
+        }
+        material.transparent = false;
+        material.opacity = 1;
+      });
+      record.edges.visible = false;
+    });
+
+    this.render();
+    const dataUrl = this.canvas.toDataURL("image/png");
+
+    restoreEntries.forEach(({ record, edgeVisible, materialState }) => {
+      const materials = Array.isArray(record.mesh.material) ? record.mesh.material : [record.mesh.material];
+      materials.forEach((material, index) => {
+        const previous = materialState[index];
+        material.color.copy(previous.color);
+        if (material.emissive) {
+          material.emissive.copy(previous.emissive);
+          material.emissiveIntensity = previous.emissiveIntensity;
+        }
+        material.transparent = previous.transparent;
+        material.opacity = previous.opacity;
+      });
+      record.edges.visible = edgeVisible;
+    });
+
+    this.grid.visible = true;
+    this.axes.visible = true;
+    this.scene.background = previousBackground;
+    this.applyVisualState();
+
+    return dataUrl;
+  }
 }
+
+
+
+
+
+
+

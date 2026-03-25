@@ -87,6 +87,10 @@ function subtract(left, right) {
   };
 }
 
+function dot(left, right) {
+  return left.x * right.x + left.y * right.y + left.z * right.z;
+}
+
 function cross(left, right) {
   return {
     x: left.y * right.z - left.z * right.y,
@@ -107,6 +111,125 @@ function normalize(vector) {
   };
 }
 
+function averageVector(vectors) {
+  if (!vectors.length) {
+    return { x: 0, y: 0, z: 0 };
+  }
+  const sum = vectors.reduce(
+    (accumulator, vector) => ({
+      x: accumulator.x + vector.x,
+      y: accumulator.y + vector.y,
+      z: accumulator.z + vector.z,
+    }),
+    { x: 0, y: 0, z: 0 },
+  );
+  return {
+    x: sum.x / vectors.length,
+    y: sum.y / vectors.length,
+    z: sum.z / vectors.length,
+  };
+}
+
+function estimateCylinderAxis(normals) {
+  const axisCandidates = [];
+  for (let index = 0; index < normals.length; index += 1) {
+    for (let otherIndex = index + 1; otherIndex < normals.length; otherIndex += 1) {
+      const axis = normalize(cross(normals[index], normals[otherIndex]), { x: 0, y: 0, z: 0 });
+      const length = Math.sqrt(axis.x ** 2 + axis.y ** 2 + axis.z ** 2);
+      if (length > 0.25) {
+        axisCandidates.push(axis);
+      }
+    }
+  }
+
+  if (!axisCandidates.length) {
+    return null;
+  }
+
+  let reference = axisCandidates[0];
+  const aligned = axisCandidates.map((axis) =>
+    dot(axis, reference) < 0 ? { x: -axis.x, y: -axis.y, z: -axis.z } : axis,
+  );
+  return normalize(averageVector(aligned), { x: 0, y: 0, z: 1 });
+}
+
+function distancePointToAxis(point, origin, axis) {
+  const offset = subtract(point, origin);
+  const projectionLength = dot(offset, axis);
+  const projection = {
+    x: origin.x + axis.x * projectionLength,
+    y: origin.y + axis.y * projectionLength,
+    z: origin.z + axis.z * projectionLength,
+  };
+  return Math.sqrt(
+    (point.x - projection.x) ** 2 +
+      (point.y - projection.y) ** 2 +
+      (point.z - projection.z) ** 2,
+  );
+}
+
+function classifyFaceGeometry(bounds, triangleCenters, triangleNormals) {
+  if (!triangleNormals.length) {
+    return { type: "unknown" };
+  }
+
+  const meanNormal = normalize(averageVector(triangleNormals), { x: 0, y: 0, z: 1 });
+  const normalAlignment =
+    triangleNormals.reduce((sum, normal) => sum + Math.abs(dot(normalize(normal), meanNormal)), 0) /
+    triangleNormals.length;
+
+  if (normalAlignment > 0.985) {
+    return {
+      type: "plane",
+      normal: {
+        x: round(meanNormal.x),
+        y: round(meanNormal.y),
+        z: round(meanNormal.z),
+      },
+    };
+  }
+
+  const axis = estimateCylinderAxis(triangleNormals);
+  if (axis) {
+    const normalPerpendicularity =
+      triangleNormals.reduce((sum, normal) => sum + (1 - Math.abs(dot(normalize(normal), axis))), 0) /
+      triangleNormals.length;
+    const axisOrigin = averageVector(triangleCenters);
+    const distances = triangleCenters.map((center) => distancePointToAxis(center, axisOrigin, axis));
+    const radius = distances.reduce((sum, value) => sum + value, 0) / Math.max(distances.length, 1);
+    const radiusVariance =
+      distances.reduce((sum, value) => sum + (value - radius) ** 2, 0) / Math.max(distances.length, 1);
+    const radiusStd = Math.sqrt(radiusVariance);
+    const radiusCv = radius > 1e-6 ? radiusStd / radius : Infinity;
+
+    if (triangleCenters.length >= 8 && normalPerpendicularity > 0.86 && radiusCv < 0.2) {
+      return {
+        type: "cylinder",
+        axisOrigin: {
+          x: round(axisOrigin.x),
+          y: round(axisOrigin.y),
+          z: round(axisOrigin.z),
+        },
+        axisDirection: {
+          x: round(axis.x),
+          y: round(axis.y),
+          z: round(axis.z),
+        },
+        radius: round(radius),
+      };
+    }
+  }
+
+  return {
+    type: "unknown",
+    normal: {
+      x: round(meanNormal.x),
+      y: round(meanNormal.y),
+      z: round(meanNormal.z),
+    },
+  };
+}
+
 function triangleArea(a, b, c) {
   const ab = subtract(b, a);
   const ac = subtract(c, a);
@@ -119,6 +242,8 @@ function buildFaceMeta(meshId, faceIndex, faceRange, positions, indices) {
   let accumulatedNormal = { x: 0, y: 0, z: 0 };
   let area = 0;
   let longestEdge = 0;
+  const triangleNormals = [];
+  const triangleCenters = [];
   const startTriangle = faceRange.first;
   const endTriangle = faceRange.last;
 
@@ -142,6 +267,12 @@ function buildFaceMeta(meshId, faceIndex, faceRange, positions, indices) {
     );
 
     const normal = cross(e01, subtract(p2, p0));
+    triangleNormals.push(normalize(normal, { x: 0, y: 0, z: 1 }));
+    triangleCenters.push({
+      x: (p0.x + p1.x + p2.x) / 3,
+      y: (p0.y + p1.y + p2.y) / 3,
+      z: (p0.z + p1.z + p2.z) / 3,
+    });
     accumulatedNormal = {
       x: accumulatedNormal.x + normal.x,
       y: accumulatedNormal.y + normal.y,
@@ -171,6 +302,7 @@ function buildFaceMeta(meshId, faceIndex, faceRange, positions, indices) {
     normal: normalize(accumulatedNormal),
     area: round(area),
     longestEdge: round(longestEdge),
+    geometry: classifyFaceGeometry(bounds, triangleCenters, triangleNormals),
   };
 }
 
