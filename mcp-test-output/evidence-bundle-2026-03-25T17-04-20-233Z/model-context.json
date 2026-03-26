@@ -1,0 +1,1721 @@
+{
+  "projectId": "c692c1bf-6549-441f-986b-bbd6656afa56",
+  "projectName": "testmodel",
+  "modelName": "Simple Assembly",
+  "parserMode": "occt-sidecar",
+  "geometryMode": "triangulated-mesh",
+  "assembly": {
+    "rootId": "node-1",
+    "partCount": 4,
+    "faceCount": 41,
+    "assemblyCount": 1,
+    "bounds": {
+      "min": {
+        "x": -50,
+        "y": -60,
+        "z": 0
+      },
+      "max": {
+        "x": 60,
+        "y": 60,
+        "z": 55
+      },
+      "center": {
+        "x": 5,
+        "y": 0,
+        "z": 27.5
+      },
+      "size": {
+        "x": 110,
+        "y": 120,
+        "z": 55
+      }
+    }
+  },
+  "tree": {
+    "id": "node-1",
+    "name": "Simple Assembly",
+    "kind": "assembly",
+    "pathNames": [
+      "Simple Assembly"
+    ],
+    "bbox": {
+      "min": {
+        "x": -50,
+        "y": -60,
+        "z": 0
+      },
+      "max": {
+        "x": 60,
+        "y": 60,
+        "z": 55
+      },
+      "center": {
+        "x": 5,
+        "y": 0,
+        "z": 27.5
+      },
+      "size": {
+        "x": 110,
+        "y": 120,
+        "z": 55
+      }
+    },
+    "children": [
+      {
+        "id": "node-2",
+        "name": "Main Block",
+        "kind": "part",
+        "pathNames": [
+          "Simple Assembly",
+          "Main Block"
+        ],
+        "bbox": {
+          "min": {
+            "x": -50,
+            "y": -60,
+            "z": 0
+          },
+          "max": {
+            "x": 50,
+            "y": 60,
+            "z": 50
+          },
+          "center": {
+            "x": 0,
+            "y": 0,
+            "z": 25
+          },
+          "size": {
+            "x": 100,
+            "y": 120,
+            "z": 50
+          }
+        },
+        "children": []
+      },
+      {
+        "id": "node-3",
+        "name": "Drawer",
+        "kind": "part",
+        "pathNames": [
+          "Simple Assembly",
+          "Drawer"
+        ],
+        "bbox": {
+          "min": {
+            "x": -50,
+            "y": -35,
+            "z": 7.5
+          },
+          "max": {
+            "x": 60,
+            "y": 35,
+            "z": 42.5
+          },
+          "center": {
+            "x": 5,
+            "y": 0,
+            "z": 25
+          },
+          "size": {
+            "x": 110,
+            "y": 70,
+            "z": 35
+          }
+        },
+        "children": []
+      },
+      {
+        "id": "node-4",
+        "name": "Pin",
+        "kind": "part",
+        "pathNames": [
+          "Simple Assembly",
+          "Pin"
+        ],
+        "bbox": {
+          "min": {
+            "x": 25,
+            "y": -55,
+            "z": 35
+          },
+          "max": {
+            "x": 45,
+            "y": -35,
+            "z": 55
+          },
+          "center": {
+            "x": 35,
+            "y": -45,
+            "z": 45
+          },
+          "size": {
+            "x": 20,
+            "y": 20,
+            "z": 20
+          }
+        },
+        "children": []
+      },
+      {
+        "id": "node-5",
+        "name": "Pin",
+        "kind": "part",
+        "pathNames": [
+          "Simple Assembly",
+          "Pin"
+        ],
+        "bbox": {
+          "min": {
+            "x": 25,
+            "y": 35,
+            "z": 35
+          },
+          "max": {
+            "x": 45,
+            "y": 55,
+            "z": 55
+          },
+          "center": {
+            "x": 35,
+            "y": 45,
+            "z": 45
+          },
+          "size": {
+            "x": 20,
+            "y": 20,
+            "z": 20
+          }
+        },
+        "children": []
+      }
+    ]
+  },
+  "parts": [
+    {
+      "partId": "node-2",
+      "name": "Main Block",
+      "pathNames": [
+        "Simple Assembly",
+        "Main Block"
+      ],
+      "bbox": {
+        "min": {
+          "x": -50,
+          "y": -60,
+          "z": 0
+        },
+        "max": {
+          "x": 50,
+          "y": 60,
+          "z": 50
+        },
+        "center": {
+          "x": 0,
+          "y": 0,
+          "z": 25
+        },
+        "size": {
+          "x": 100,
+          "y": 120,
+          "z": 50
+        }
+      },
+      "tags": [
+        "structure_like"
+      ],
+      "faceCount": 16,
+      "facesTruncated": false,
+      "faces": [
+        {
+          "faceId": "mesh-0:face-0",
+          "name": "Face 1",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": -50,
+            "y": 0,
+            "z": 25
+          },
+          "normal": {
+            "x": -1,
+            "y": 0,
+            "z": 0
+          },
+          "area": 4500,
+          "longestEdge": 120
+        },
+        {
+          "faceId": "mesh-0:face-1",
+          "name": "Face 2",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 45,
+            "z": 35
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "area": 78.1417,
+          "longestEdge": 9.8481
+        },
+        {
+          "faceId": "mesh-0:face-2",
+          "name": "Face 3",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 42.5,
+            "z": 42.5
+          },
+          "normal": {
+            "x": 9.473903143468006e-17,
+            "y": 1,
+            "z": 0
+          },
+          "area": 235.3205,
+          "longestEdge": 15.0253
+        },
+        {
+          "faceId": "mesh-0:face-3",
+          "name": "Face 4",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 47.5,
+            "z": 42.5
+          },
+          "normal": {
+            "x": -4.736951571734e-17,
+            "y": -1,
+            "z": 0
+          },
+          "area": 235.3205,
+          "longestEdge": 15.0253
+        },
+        {
+          "faceId": "mesh-0:face-4",
+          "name": "Face 5",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -45,
+            "z": 35
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "area": 78.1417,
+          "longestEdge": 9.8481
+        },
+        {
+          "faceId": "mesh-0:face-5",
+          "name": "Face 6",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -47.5,
+            "z": 42.5
+          },
+          "normal": {
+            "x": 9.473903143468006e-17,
+            "y": 1,
+            "z": 0
+          },
+          "area": 235.3205,
+          "longestEdge": 15.0253
+        },
+        {
+          "faceId": "mesh-0:face-6",
+          "name": "Face 7",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -42.5,
+            "z": 42.5
+          },
+          "normal": {
+            "x": -4.736951571734e-17,
+            "y": -1,
+            "z": 0
+          },
+          "area": 235.3205,
+          "longestEdge": 15.0253
+        },
+        {
+          "faceId": "mesh-0:face-7",
+          "name": "Face 8",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": 0,
+            "z": 50
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "area": 11843.7166,
+          "longestEdge": 130.1881
+        },
+        {
+          "faceId": "mesh-0:face-8",
+          "name": "Face 9",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": -1
+          },
+          "area": 12000,
+          "longestEdge": 156.205
+        },
+        {
+          "faceId": "mesh-0:face-9",
+          "name": "Face 10",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": 60,
+            "z": 25
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          "area": 5000,
+          "longestEdge": 111.8034
+        },
+        {
+          "faceId": "mesh-0:face-10",
+          "name": "Face 11",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": -60,
+            "z": 25
+          },
+          "normal": {
+            "x": 0,
+            "y": -1,
+            "z": 0
+          },
+          "area": 5000,
+          "longestEdge": 111.8034
+        },
+        {
+          "faceId": "mesh-0:face-11",
+          "name": "Face 12",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": 0,
+            "z": 10
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "area": 5000,
+          "longestEdge": 111.8034
+        },
+        {
+          "faceId": "mesh-0:face-12",
+          "name": "Face 13",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": -25,
+            "z": 25
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          "area": 3000,
+          "longestEdge": 104.4031
+        },
+        {
+          "faceId": "mesh-0:face-13",
+          "name": "Face 14",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": 25,
+            "z": 25
+          },
+          "normal": {
+            "x": 0,
+            "y": -1,
+            "z": 0
+          },
+          "area": 3000,
+          "longestEdge": 104.4031
+        },
+        {
+          "faceId": "mesh-0:face-14",
+          "name": "Face 15",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": 0,
+            "z": 40
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": -1
+          },
+          "area": 5000,
+          "longestEdge": 111.8034
+        },
+        {
+          "faceId": "mesh-0:face-15",
+          "name": "Face 16",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 50,
+            "y": 0,
+            "z": 25
+          },
+          "normal": {
+            "x": 1,
+            "y": 0,
+            "z": 0
+          },
+          "area": 4500,
+          "longestEdge": 120
+        }
+      ]
+    },
+    {
+      "partId": "node-3",
+      "name": "Drawer",
+      "pathNames": [
+        "Simple Assembly",
+        "Drawer"
+      ],
+      "bbox": {
+        "min": {
+          "x": -50,
+          "y": -35,
+          "z": 7.5
+        },
+        "max": {
+          "x": 60,
+          "y": 35,
+          "z": 42.5
+        },
+        "center": {
+          "x": 5,
+          "y": 0,
+          "z": 25
+        },
+        "size": {
+          "x": 110,
+          "y": 70,
+          "z": 35
+        }
+      },
+      "tags": [
+        "structure_like"
+      ],
+      "faceCount": 11,
+      "facesTruncated": false,
+      "faces": [
+        {
+          "faceId": "mesh-1:face-0",
+          "name": "Face 1",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 50,
+            "y": 0,
+            "z": 25
+          },
+          "normal": {
+            "x": -1,
+            "y": 0,
+            "z": 0
+          },
+          "area": 950,
+          "longestEdge": 70
+        },
+        {
+          "faceId": "mesh-1:face-1",
+          "name": "Face 2",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 60,
+            "y": 0,
+            "z": 25
+          },
+          "normal": {
+            "x": 1,
+            "y": 0,
+            "z": 0
+          },
+          "area": 2450,
+          "longestEdge": 78.2624
+        },
+        {
+          "faceId": "mesh-1:face-2",
+          "name": "Face 3",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 55,
+            "y": -35,
+            "z": 25
+          },
+          "normal": {
+            "x": 0,
+            "y": -1,
+            "z": 0
+          },
+          "area": 350,
+          "longestEdge": 36.4005
+        },
+        {
+          "faceId": "mesh-1:face-3",
+          "name": "Face 4",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 55,
+            "y": 0,
+            "z": 42.5
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "area": 700,
+          "longestEdge": 70.7107
+        },
+        {
+          "faceId": "mesh-1:face-4",
+          "name": "Face 5",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 55,
+            "y": 35,
+            "z": 25
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": 0
+          },
+          "area": 350,
+          "longestEdge": 36.4005
+        },
+        {
+          "faceId": "mesh-1:face-5",
+          "name": "Face 6",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 55,
+            "y": 0,
+            "z": 7.5
+          },
+          "normal": {
+            "x": 0,
+            "y": -1.0150610510858574e-16,
+            "z": -1
+          },
+          "area": 700,
+          "longestEdge": 70.7107
+        },
+        {
+          "faceId": "mesh-1:face-6",
+          "name": "Face 7",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": 0,
+            "z": 10
+          },
+          "normal": {
+            "x": 0,
+            "y": -7.105427357601002e-17,
+            "z": -1
+          },
+          "area": 5000,
+          "longestEdge": 111.8034
+        },
+        {
+          "faceId": "mesh-1:face-7",
+          "name": "Face 8",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": -25,
+            "z": 25
+          },
+          "normal": {
+            "x": 0,
+            "y": -1,
+            "z": -1.1842378929335003e-16
+          },
+          "area": 3000,
+          "longestEdge": 104.4031
+        },
+        {
+          "faceId": "mesh-1:face-8",
+          "name": "Face 9",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": 25,
+            "z": 25
+          },
+          "normal": {
+            "x": 0,
+            "y": 1,
+            "z": 1.1842378929335003e-16
+          },
+          "area": 3000,
+          "longestEdge": 104.4031
+        },
+        {
+          "faceId": "mesh-1:face-9",
+          "name": "Face 10",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": -50,
+            "y": 0,
+            "z": 25
+          },
+          "normal": {
+            "x": -1,
+            "y": 0,
+            "z": 0
+          },
+          "area": 1500,
+          "longestEdge": 58.3095
+        },
+        {
+          "faceId": "mesh-1:face-10",
+          "name": "Face 11",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 0,
+            "y": 0,
+            "z": 40
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "area": 5000,
+          "longestEdge": 111.8034
+        }
+      ]
+    },
+    {
+      "partId": "node-4",
+      "name": "Pin",
+      "pathNames": [
+        "Simple Assembly",
+        "Pin"
+      ],
+      "bbox": {
+        "min": {
+          "x": 25,
+          "y": -55,
+          "z": 35
+        },
+        "max": {
+          "x": 45,
+          "y": -35,
+          "z": 55
+        },
+        "center": {
+          "x": 35,
+          "y": -45,
+          "z": 45
+        },
+        "size": {
+          "x": 20,
+          "y": 20,
+          "z": 20
+        }
+      },
+      "tags": [
+        "fastener_like"
+      ],
+      "faceCount": 7,
+      "facesTruncated": false,
+      "faces": [
+        {
+          "faceId": "mesh-2:face-0",
+          "name": "Face 1",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -40,
+            "z": 52.5
+          },
+          "normal": {
+            "x": -1.421085471520201e-16,
+            "y": 1,
+            "z": 0
+          },
+          "area": 156.8803,
+          "longestEdge": 5.2951
+        },
+        {
+          "faceId": "mesh-2:face-1",
+          "name": "Face 2",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -50,
+            "z": 52.5
+          },
+          "normal": {
+            "x": -3.552713678800501e-17,
+            "y": -1,
+            "z": 0
+          },
+          "area": 156.8803,
+          "longestEdge": 5.2951
+        },
+        {
+          "faceId": "mesh-2:face-2",
+          "name": "Face 3",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -45,
+            "z": 50
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": -1
+          },
+          "area": 234.425,
+          "longestEdge": 5.1497
+        },
+        {
+          "faceId": "mesh-2:face-3",
+          "name": "Face 4",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -45,
+            "z": 35
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": -1
+          },
+          "area": 78.1417,
+          "longestEdge": 9.6593
+        },
+        {
+          "faceId": "mesh-2:face-4",
+          "name": "Face 5",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -42.5,
+            "z": 42.5
+          },
+          "normal": {
+            "x": 4.736951571734e-17,
+            "y": 1,
+            "z": 0
+          },
+          "area": 235.3205,
+          "longestEdge": 15.0253
+        },
+        {
+          "faceId": "mesh-2:face-5",
+          "name": "Face 6",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -47.5,
+            "z": 42.5
+          },
+          "normal": {
+            "x": -9.473903143468006e-17,
+            "y": -1,
+            "z": 0
+          },
+          "area": 235.3205,
+          "longestEdge": 15.0253
+        },
+        {
+          "faceId": "mesh-2:face-6",
+          "name": "Face 7",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": -45,
+            "z": 55
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "area": 312.5667,
+          "longestEdge": 19.3185
+        }
+      ]
+    },
+    {
+      "partId": "node-5",
+      "name": "Pin",
+      "pathNames": [
+        "Simple Assembly",
+        "Pin"
+      ],
+      "bbox": {
+        "min": {
+          "x": 25,
+          "y": 35,
+          "z": 35
+        },
+        "max": {
+          "x": 45,
+          "y": 55,
+          "z": 55
+        },
+        "center": {
+          "x": 35,
+          "y": 45,
+          "z": 45
+        },
+        "size": {
+          "x": 20,
+          "y": 20,
+          "z": 20
+        }
+      },
+      "tags": [
+        "fastener_like"
+      ],
+      "faceCount": 7,
+      "facesTruncated": false,
+      "faces": [
+        {
+          "faceId": "mesh-3:face-0",
+          "name": "Face 1",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 50,
+            "z": 52.5
+          },
+          "normal": {
+            "x": -1.421085471520201e-16,
+            "y": 1,
+            "z": 0
+          },
+          "area": 156.8803,
+          "longestEdge": 5.2951
+        },
+        {
+          "faceId": "mesh-3:face-1",
+          "name": "Face 2",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 40,
+            "z": 52.5
+          },
+          "normal": {
+            "x": -3.552713678800501e-17,
+            "y": -1,
+            "z": 0
+          },
+          "area": 156.8803,
+          "longestEdge": 5.2951
+        },
+        {
+          "faceId": "mesh-3:face-2",
+          "name": "Face 3",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 45,
+            "z": 50
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": -1
+          },
+          "area": 234.425,
+          "longestEdge": 5.1497
+        },
+        {
+          "faceId": "mesh-3:face-3",
+          "name": "Face 4",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 45,
+            "z": 35
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": -1
+          },
+          "area": 78.1417,
+          "longestEdge": 9.6593
+        },
+        {
+          "faceId": "mesh-3:face-4",
+          "name": "Face 5",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 47.5,
+            "z": 42.5
+          },
+          "normal": {
+            "x": 4.736951571734e-17,
+            "y": 1,
+            "z": 0
+          },
+          "area": 235.3205,
+          "longestEdge": 15.0253
+        },
+        {
+          "faceId": "mesh-3:face-5",
+          "name": "Face 6",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 42.5,
+            "z": 42.5
+          },
+          "normal": {
+            "x": -9.473903143468006e-17,
+            "y": -1,
+            "z": 0
+          },
+          "area": 235.3205,
+          "longestEdge": 15.0253
+        },
+        {
+          "faceId": "mesh-3:face-6",
+          "name": "Face 7",
+          "geometry": {
+            "type": "unknown",
+            "radius": null,
+            "axisOrigin": null,
+            "axisDirection": null
+          },
+          "center": {
+            "x": 35,
+            "y": 45,
+            "z": 55
+          },
+          "normal": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "area": 312.5667,
+          "longestEdge": 19.3185
+        }
+      ]
+    }
+  ],
+  "colorMaps": {
+    "display": [
+      {
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "name": "Main Block",
+        "colorHex": "#4E79A7",
+        "visible": true
+      },
+      {
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "name": "Drawer",
+        "colorHex": "#E15759",
+        "visible": true
+      },
+      {
+        "nodeId": "node-4",
+        "partId": "node-4",
+        "name": "Pin",
+        "colorHex": "#B07AA1",
+        "visible": true
+      },
+      {
+        "nodeId": "node-5",
+        "partId": "node-5",
+        "name": "Pin",
+        "colorHex": "#B07AA1",
+        "visible": true
+      }
+    ],
+    "partMask": [
+      {
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "name": "Main Block",
+        "colorHex": "#000001",
+        "visible": true
+      },
+      {
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "name": "Drawer",
+        "colorHex": "#000002",
+        "visible": true
+      },
+      {
+        "nodeId": "node-4",
+        "partId": "node-4",
+        "name": "Pin",
+        "colorHex": "#000003",
+        "visible": true
+      },
+      {
+        "nodeId": "node-5",
+        "partId": "node-5",
+        "name": "Pin",
+        "colorHex": "#000004",
+        "visible": true
+      }
+    ],
+    "faceMask": [
+      {
+        "faceId": "mesh-0:face-0",
+        "faceName": "Face 1",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000001",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-1",
+        "faceName": "Face 2",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000002",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-2",
+        "faceName": "Face 3",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000003",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-3",
+        "faceName": "Face 4",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000004",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-4",
+        "faceName": "Face 5",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000005",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-5",
+        "faceName": "Face 6",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000006",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-6",
+        "faceName": "Face 7",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000007",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-7",
+        "faceName": "Face 8",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000008",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-8",
+        "faceName": "Face 9",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000009",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-9",
+        "faceName": "Face 10",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#00000a",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-10",
+        "faceName": "Face 11",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#00000b",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-11",
+        "faceName": "Face 12",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#00000c",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-12",
+        "faceName": "Face 13",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#00000d",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-13",
+        "faceName": "Face 14",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#00000e",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-14",
+        "faceName": "Face 15",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#00000f",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-0:face-15",
+        "faceName": "Face 16",
+        "meshId": "mesh-0",
+        "nodeId": "node-2",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "colorHex": "#000010",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-0",
+        "faceName": "Face 1",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#000011",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-1",
+        "faceName": "Face 2",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#000012",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-2",
+        "faceName": "Face 3",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#000013",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-3",
+        "faceName": "Face 4",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#000014",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-4",
+        "faceName": "Face 5",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#000015",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-5",
+        "faceName": "Face 6",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#000016",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-6",
+        "faceName": "Face 7",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#000017",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-7",
+        "faceName": "Face 8",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#000018",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-8",
+        "faceName": "Face 9",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#000019",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-9",
+        "faceName": "Face 10",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#00001a",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-1:face-10",
+        "faceName": "Face 11",
+        "meshId": "mesh-1",
+        "nodeId": "node-3",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "colorHex": "#00001b",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-2:face-0",
+        "faceName": "Face 1",
+        "meshId": "mesh-2",
+        "nodeId": "node-4",
+        "partId": "node-4",
+        "partName": "Pin",
+        "colorHex": "#00001c",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-2:face-1",
+        "faceName": "Face 2",
+        "meshId": "mesh-2",
+        "nodeId": "node-4",
+        "partId": "node-4",
+        "partName": "Pin",
+        "colorHex": "#00001d",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-2:face-2",
+        "faceName": "Face 3",
+        "meshId": "mesh-2",
+        "nodeId": "node-4",
+        "partId": "node-4",
+        "partName": "Pin",
+        "colorHex": "#00001e",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-2:face-3",
+        "faceName": "Face 4",
+        "meshId": "mesh-2",
+        "nodeId": "node-4",
+        "partId": "node-4",
+        "partName": "Pin",
+        "colorHex": "#00001f",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-2:face-4",
+        "faceName": "Face 5",
+        "meshId": "mesh-2",
+        "nodeId": "node-4",
+        "partId": "node-4",
+        "partName": "Pin",
+        "colorHex": "#000020",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-2:face-5",
+        "faceName": "Face 6",
+        "meshId": "mesh-2",
+        "nodeId": "node-4",
+        "partId": "node-4",
+        "partName": "Pin",
+        "colorHex": "#000021",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-2:face-6",
+        "faceName": "Face 7",
+        "meshId": "mesh-2",
+        "nodeId": "node-4",
+        "partId": "node-4",
+        "partName": "Pin",
+        "colorHex": "#000022",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-3:face-0",
+        "faceName": "Face 1",
+        "meshId": "mesh-3",
+        "nodeId": "node-5",
+        "partId": "node-5",
+        "partName": "Pin",
+        "colorHex": "#000023",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-3:face-1",
+        "faceName": "Face 2",
+        "meshId": "mesh-3",
+        "nodeId": "node-5",
+        "partId": "node-5",
+        "partName": "Pin",
+        "colorHex": "#000024",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-3:face-2",
+        "faceName": "Face 3",
+        "meshId": "mesh-3",
+        "nodeId": "node-5",
+        "partId": "node-5",
+        "partName": "Pin",
+        "colorHex": "#000025",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-3:face-3",
+        "faceName": "Face 4",
+        "meshId": "mesh-3",
+        "nodeId": "node-5",
+        "partId": "node-5",
+        "partName": "Pin",
+        "colorHex": "#000026",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-3:face-4",
+        "faceName": "Face 5",
+        "meshId": "mesh-3",
+        "nodeId": "node-5",
+        "partId": "node-5",
+        "partName": "Pin",
+        "colorHex": "#000027",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-3:face-5",
+        "faceName": "Face 6",
+        "meshId": "mesh-3",
+        "nodeId": "node-5",
+        "partId": "node-5",
+        "partName": "Pin",
+        "colorHex": "#000028",
+        "visible": true
+      },
+      {
+        "faceId": "mesh-3:face-6",
+        "faceName": "Face 7",
+        "meshId": "mesh-3",
+        "nodeId": "node-5",
+        "partId": "node-5",
+        "partName": "Pin",
+        "colorHex": "#000029",
+        "visible": true
+      }
+    ]
+  }
+}

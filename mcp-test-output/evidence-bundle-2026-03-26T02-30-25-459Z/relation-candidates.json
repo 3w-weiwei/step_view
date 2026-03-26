@@ -1,0 +1,518 @@
+{
+  "projectId": "c692c1bf-6549-441f-986b-bbd6656afa56",
+  "relationCandidates": [
+    {
+      "candidateId": "relation:node-2__node-3",
+      "order": 1,
+      "partAId": "node-2",
+      "partAName": "Main Block",
+      "partBId": "node-3",
+      "partBName": "Drawer",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-3:A",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-0:face-11",
+          "mesh-0:face-12",
+          "mesh-0:face-13",
+          "mesh-0:face-14"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 4,
+        "areaTotal": 16000,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-3:B",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-1:face-6",
+          "mesh-1:face-7",
+          "mesh-1:face-8",
+          "mesh-1:face-10"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 4,
+        "areaTotal": 16000,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 1,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=0",
+        "overlap=1",
+        "area_similarity=1"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-11",
+          "faceBId": "mesh-1:face-6",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-12",
+          "faceBId": "mesh-1:face-7",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-13",
+          "faceBId": "mesh-1:face-8",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-14",
+          "faceBId": "mesh-1:face-10",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-2__node-4",
+      "order": 2,
+      "partAId": "node-2",
+      "partAName": "Main Block",
+      "partBId": "node-4",
+      "partBName": "Pin",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-4:A",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-0:face-4",
+          "mesh-0:face-5",
+          "mesh-0:face-6",
+          "mesh-0:face-7"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 4,
+        "areaTotal": 12392.4993,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-4:B",
+        "partId": "node-4",
+        "partName": "Pin",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-2:face-3",
+          "mesh-2:face-5",
+          "mesh-2:face-4",
+          "mesh-2:face-2"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 4,
+        "areaTotal": 783.2077,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 1,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=0",
+        "overlap=1",
+        "area_similarity=1",
+        "area_similarity=0.0198"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-4",
+          "faceBId": "mesh-2:face-3",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-5",
+          "faceBId": "mesh-2:face-5",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-6",
+          "faceBId": "mesh-2:face-4",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-7",
+          "faceBId": "mesh-2:face-2",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9216,
+          "gap": 0
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-2__node-5",
+      "order": 3,
+      "partAId": "node-2",
+      "partAName": "Main Block",
+      "partBId": "node-5",
+      "partBName": "Pin",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-5:A",
+        "partId": "node-2",
+        "partName": "Main Block",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-0:face-1",
+          "mesh-0:face-2",
+          "mesh-0:face-3",
+          "mesh-0:face-7"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 4,
+        "areaTotal": 12392.4993,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-5:B",
+        "partId": "node-5",
+        "partName": "Pin",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-3:face-3",
+          "mesh-3:face-5",
+          "mesh-3:face-4",
+          "mesh-3:face-2"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 4,
+        "areaTotal": 783.2077,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 1,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=0",
+        "overlap=1",
+        "area_similarity=1",
+        "area_similarity=0.0198"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-1",
+          "faceBId": "mesh-3:face-3",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-2",
+          "faceBId": "mesh-3:face-5",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-3",
+          "faceBId": "mesh-3:face-4",
+          "relation": "planar-coincident-candidate",
+          "score": 1,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-7",
+          "faceBId": "mesh-3:face-2",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9216,
+          "gap": 0
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-3__node-4",
+      "order": 4,
+      "partAId": "node-3",
+      "partAName": "Drawer",
+      "partBId": "node-4",
+      "partBName": "Pin",
+      "featureGroupA": {
+        "featureId": "fg:node-3__node-4:A",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-1:face-2",
+          "mesh-1:face-10",
+          "mesh-1:face-7"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 3,
+        "areaTotal": 8350,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-3__node-4:B",
+        "partId": "node-4",
+        "partName": "Pin",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-2:face-4",
+          "mesh-2:face-3",
+          "mesh-2:face-0"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 3,
+        "areaTotal": 470.3425,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 0.719,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=7.5",
+        "overlap=0.25",
+        "area_similarity=0.6723",
+        "gap=5",
+        "overlap=0.5",
+        "area_similarity=0.0156",
+        "overlap=0",
+        "area_similarity=0.4482",
+        "gap=17.5",
+        "overlap=0.6667",
+        "area_similarity=0.0784"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-1:face-2",
+          "faceBId": "mesh-2:face-4",
+          "relation": "planar-coincident-candidate",
+          "score": 0.719,
+          "gap": 7.5
+        },
+        {
+          "faceAId": "mesh-1:face-10",
+          "faceBId": "mesh-2:face-3",
+          "relation": "planar-coincident-candidate",
+          "score": 0.707,
+          "gap": 5
+        },
+        {
+          "faceAId": "mesh-1:face-2",
+          "faceBId": "mesh-2:face-0",
+          "relation": "planar-coincident-candidate",
+          "score": 0.686,
+          "gap": 5
+        },
+        {
+          "faceAId": "mesh-1:face-7",
+          "faceBId": "mesh-2:face-4",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6396,
+          "gap": 17.5
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-3__node-5",
+      "order": 5,
+      "partAId": "node-3",
+      "partAName": "Drawer",
+      "partBId": "node-5",
+      "partBName": "Pin",
+      "featureGroupA": {
+        "featureId": "fg:node-3__node-5:A",
+        "partId": "node-3",
+        "partName": "Drawer",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-1:face-4",
+          "mesh-1:face-10",
+          "mesh-1:face-7"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 3,
+        "areaTotal": 8350,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-3__node-5:B",
+        "partId": "node-5",
+        "partName": "Pin",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-3:face-5",
+          "mesh-3:face-3",
+          "mesh-3:face-1",
+          "mesh-3:face-4"
+        ],
+        "geometryTypes": [
+          "unknown"
+        ],
+        "faceCount": 4,
+        "areaTotal": 705.663,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 0.719,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=7.5",
+        "overlap=0.25",
+        "area_similarity=0.6723",
+        "gap=5",
+        "overlap=0.5",
+        "area_similarity=0.0156",
+        "overlap=0",
+        "area_similarity=0.4482",
+        "gap=72.5",
+        "overlap=0.6667",
+        "area_similarity=0.0784"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-1:face-4",
+          "faceBId": "mesh-3:face-5",
+          "relation": "planar-coincident-candidate",
+          "score": 0.719,
+          "gap": 7.5
+        },
+        {
+          "faceAId": "mesh-1:face-10",
+          "faceBId": "mesh-3:face-3",
+          "relation": "planar-coincident-candidate",
+          "score": 0.707,
+          "gap": 5
+        },
+        {
+          "faceAId": "mesh-1:face-4",
+          "faceBId": "mesh-3:face-1",
+          "relation": "planar-coincident-candidate",
+          "score": 0.686,
+          "gap": 5
+        },
+        {
+          "faceAId": "mesh-1:face-7",
+          "faceBId": "mesh-3:face-4",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6396,
+          "gap": 72.5
+        }
+      ]
+    }
+  ],
+  "baseCandidates": [
+    {
+      "partId": "node-2",
+      "name": "Main Block",
+      "score": 0.9945,
+      "volumeScore": 1,
+      "supportAreaScore": 1,
+      "connectivityScore": 1,
+      "centerBias": 0.9675,
+      "reasons": [
+        "large_volume",
+        "large_support_face",
+        "high_connectivity",
+        "spatially_central"
+      ]
+    },
+    {
+      "partId": "node-3",
+      "name": "Drawer",
+      "score": 0.6424,
+      "volumeScore": 0.4492,
+      "supportAreaScore": 0.4167,
+      "connectivityScore": 1,
+      "centerBias": 0.9855,
+      "reasons": [
+        "high_connectivity",
+        "spatially_central"
+      ]
+    },
+    {
+      "partId": "node-4",
+      "name": "Pin",
+      "score": 0,
+      "volumeScore": 0.0133,
+      "supportAreaScore": 0.026,
+      "connectivityScore": 0.6667,
+      "centerBias": 0.6692,
+      "reasons": [
+        "high_connectivity",
+        "spatially_central",
+        "fastener_like_penalty"
+      ]
+    },
+    {
+      "partId": "node-5",
+      "name": "Pin",
+      "score": 0,
+      "volumeScore": 0.0133,
+      "supportAreaScore": 0.026,
+      "connectivityScore": 0.6667,
+      "centerBias": 0.6692,
+      "reasons": [
+        "high_connectivity",
+        "spatially_central",
+        "fastener_like_penalty"
+      ]
+    }
+  ],
+  "subassemblyCandidates": [
+    {
+      "candidateId": "subassembly:node-2+node-3+node-4+node-5",
+      "partIds": [
+        "node-2",
+        "node-3",
+        "node-4",
+        "node-5"
+      ],
+      "score": 0.9157,
+      "internalScore": 0.8876,
+      "externalScore": 0,
+      "reasons": [
+        "dense_internal_relations",
+        "weak_external_relations",
+        "multi_part_cluster"
+      ]
+    }
+  ],
+  "graspCandidates": []
+}

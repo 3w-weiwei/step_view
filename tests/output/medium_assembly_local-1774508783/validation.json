@@ -1,0 +1,32 @@
+{
+  "projectId": "8bbd45ae-76dc-41d8-8522-089bc1462d33",
+  "hypothesis": {
+    "type": "relation",
+    "relationCandidateId": "relation:node-9__node-10",
+    "partAId": "node-9",
+    "partBId": "node-10"
+  },
+  "result": {
+    "valid": true,
+    "status": "valid",
+    "score": 0.9999,
+    "summary": "Hypothesis passed the requested validation checks.",
+    "checks": {
+      "relationConsistency": {
+        "ok": true,
+        "score": 0.9999,
+        "reasons": [
+          "axis_alignment=1",
+          "axis_distance=0.0002",
+          "radius_similarity=1",
+          "normal_alignment=-1",
+          "gap=2.3806",
+          "overlap=1"
+        ],
+        "relationCandidateId": "relation:node-9__node-10"
+      }
+    },
+    "risks": [],
+    "nextEvidenceNeeded": []
+  }
+}

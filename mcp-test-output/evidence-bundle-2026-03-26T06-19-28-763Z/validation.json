@@ -1,0 +1,30 @@
+{
+  "projectId": "c692c1bf-6549-441f-986b-bbd6656afa56",
+  "hypothesis": {
+    "type": "relation",
+    "relationCandidateId": "relation:node-2__node-3",
+    "partAId": "node-2",
+    "partBId": "node-3"
+  },
+  "result": {
+    "valid": true,
+    "status": "valid",
+    "score": 1,
+    "summary": "Hypothesis passed the requested validation checks.",
+    "checks": {
+      "relationConsistency": {
+        "ok": true,
+        "score": 1,
+        "reasons": [
+          "normal_alignment=-1",
+          "gap=0",
+          "overlap=1",
+          "area_similarity=1"
+        ],
+        "relationCandidateId": "relation:node-2__node-3"
+      }
+    },
+    "risks": [],
+    "nextEvidenceNeeded": []
+  }
+}

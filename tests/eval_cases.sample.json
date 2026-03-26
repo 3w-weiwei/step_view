@@ -1,0 +1,72 @@
+[
+  {
+    "case_id": "simple_assembly_local",
+    "project_id": "c692c1bf-6549-441f-986b-bbd6656afa56",
+    "candidate_id": null,
+    "tool_arguments": {
+      "model_context": {
+        "includeFaces": true,
+        "includeColorMaps": true,
+        "maxFaceCountPerPart": 24
+      },
+      "relation_candidates": {
+        "topK": 12,
+        "includeBaseCandidates": true,
+        "includeSubassemblyCandidates": true,
+        "includeGraspCandidates": true
+      },
+      "evidence_bundle": {
+        "includeGlobalViews": true,
+        "includeLocalViews": true,
+        "includeSectionViews": false,
+        "includePartMask": true,
+        "includeFaceMask": true,
+        "includeOverlay": true,
+        "includeTransparentContext": false,
+        "width": 720,
+        "height": 540
+      }
+    },
+    "expected": {
+      "base_part_id": null,
+      "relation_pairs": [],
+      "subassemblies": [],
+      "sequence_part_order": []
+    }
+  },
+  {
+    "case_id": "medium_assembly_local",
+    "project_id": "8bbd45ae-76dc-41d8-8522-089bc1462d33",
+    "candidate_id": null,
+    "tool_arguments": {
+      "model_context": {
+        "includeFaces": true,
+        "includeColorMaps": true,
+        "maxFaceCountPerPart": 32
+      },
+      "relation_candidates": {
+        "topK": 16,
+        "includeBaseCandidates": true,
+        "includeSubassemblyCandidates": true,
+        "includeGraspCandidates": true
+      },
+      "evidence_bundle": {
+        "includeGlobalViews": true,
+        "includeLocalViews": true,
+        "includeSectionViews": false,
+        "includePartMask": true,
+        "includeFaceMask": true,
+        "includeOverlay": true,
+        "includeTransparentContext": false,
+        "width": 720,
+        "height": 540
+      }
+    },
+    "expected": {
+      "base_part_id": null,
+      "relation_pairs": [],
+      "subassemblies": [],
+      "sequence_part_order": []
+    }
+  }
+]

@@ -1,0 +1,2443 @@
+{
+  "projectId": "8bbd45ae-76dc-41d8-8522-089bc1462d33",
+  "relationCandidates": [
+    {
+      "candidateId": "relation:node-9__node-10",
+      "order": 1,
+      "partAId": "node-9",
+      "partAName": "1/8\" Pin v0 (1)",
+      "partBId": "node-10",
+      "partBName": "SOLID",
+      "featureGroupA": {
+        "featureId": "fg:node-9__node-10:A",
+        "partId": "node-9",
+        "partName": "1/8\" Pin v0 (1)",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-7:face-1",
+          "mesh-7:face-3",
+          "mesh-7:face-4"
+        ],
+        "geometryTypes": [
+          "cylinder",
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 3,
+        "areaTotal": 93.5318,
+        "primaryAxis": {
+          "origin": {
+            "x": 0,
+            "y": 73.9775,
+            "z": 0
+          },
+          "direction": {
+            "x": 0.00039999995000000943,
+            "y": -0.9999998750000235,
+            "z": 0.000299999962500007
+          },
+          "radius": 1.5821
+        }
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-9__node-10:B",
+        "partId": "node-10",
+        "partName": "SOLID",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-8:face-36",
+          "mesh-8:face-35",
+          "mesh-8:face-38"
+        ],
+        "geometryTypes": [
+          "cylinder",
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 3,
+        "areaTotal": 1476.7369,
+        "primaryAxis": {
+          "origin": {
+            "x": 0,
+            "y": 74.295,
+            "z": 0
+          },
+          "direction": {
+            "x": 0.004199954556737543,
+            "y": -0.9999891801756056,
+            "z": 0.001999978360351211
+          },
+          "radius": 1.5821
+        }
+      },
+      "relationType": "insertable_coaxial_candidate",
+      "sharedAxis": {
+        "origin": {
+          "x": 0,
+          "y": 73.9775,
+          "z": 0
+        },
+        "direction": {
+          "x": 0.00039999995000000943,
+          "y": -0.9999998750000235,
+          "z": 0.000299999962500007
+        }
+      },
+      "bboxGap": 0,
+      "score": 0.9999,
+      "ruleEvidence": [
+        "axis_alignment=1",
+        "axis_distance=0.0002",
+        "radius_similarity=1",
+        "normal_alignment=-1",
+        "gap=2.3806",
+        "overlap=1",
+        "area_similarity=0.9204",
+        "gap=2.6981",
+        "area_similarity=0.3085",
+        "gap=6.6675",
+        "area_similarity=0.0059"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-7:face-1",
+          "faceBId": "mesh-8:face-36",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9999,
+          "gap": 0.0002
+        },
+        {
+          "faceAId": "mesh-7:face-3",
+          "faceBId": "mesh-8:face-35",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9607,
+          "gap": 2.3806
+        },
+        {
+          "faceAId": "mesh-7:face-4",
+          "faceBId": "mesh-8:face-35",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9073,
+          "gap": 2.6981
+        },
+        {
+          "faceAId": "mesh-7:face-3",
+          "faceBId": "mesh-8:face-38",
+          "relation": "planar-coincident-candidate",
+          "score": 0.8282,
+          "gap": 6.6675
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-2__node-10",
+      "order": 2,
+      "partAId": "node-2",
+      "partAName": "Dovetail Clip v2",
+      "partBId": "node-10",
+      "partBName": "SOLID",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-10:A",
+        "partId": "node-2",
+        "partName": "Dovetail Clip v2",
+        "kind": "planar_group",
+        "faceIds": [
+          "mesh-0:face-12",
+          "mesh-0:face-13",
+          "mesh-0:face-7",
+          "mesh-0:face-10"
+        ],
+        "geometryTypes": [
+          "plane"
+        ],
+        "faceCount": 4,
+        "areaTotal": 990.662,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-10:B",
+        "partId": "node-10",
+        "partName": "SOLID",
+        "kind": "planar_group",
+        "faceIds": [
+          "mesh-8:face-32",
+          "mesh-8:face-37",
+          "mesh-8:face-15",
+          "mesh-8:face-11"
+        ],
+        "geometryTypes": [
+          "plane"
+        ],
+        "faceCount": 4,
+        "areaTotal": 1031.0072,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 0.9973,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=0",
+        "overlap=1",
+        "area_similarity=0.9664",
+        "overlap=0.9952",
+        "area_similarity=0.9386",
+        "gap=0.127",
+        "overlap=0.9618",
+        "area_similarity=0.9922"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-12",
+          "faceBId": "mesh-8:face-32",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9973,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-13",
+          "faceBId": "mesh-8:face-37",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9973,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-7",
+          "faceBId": "mesh-8:face-15",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9941,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-10",
+          "faceBId": "mesh-8:face-11",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9906,
+          "gap": 0.127
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-3__node-10",
+      "order": 3,
+      "partAId": "node-3",
+      "partAName": "3/8-16 Socket Head Cap Screw v3",
+      "partBId": "node-10",
+      "partBName": "SOLID",
+      "featureGroupA": {
+        "featureId": "fg:node-3__node-10:A",
+        "partId": "node-3",
+        "partName": "3/8-16 Socket Head Cap Screw v3",
+        "kind": "cylindrical_group",
+        "faceIds": [
+          "mesh-1:face-13",
+          "mesh-1:face-12",
+          "mesh-1:face-11",
+          "mesh-1:face-17"
+        ],
+        "geometryTypes": [
+          "cylinder"
+        ],
+        "faceCount": 4,
+        "areaTotal": 14.0795,
+        "primaryAxis": {
+          "origin": {
+            "x": -0.0248,
+            "y": 68.579,
+            "z": 9.0353
+          },
+          "direction": {
+            "x": 0.013299534125479233,
+            "y": 0.12659556543501285,
+            "z": -0.9918652555686355
+          },
+          "radius": 4.7122
+        }
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-3__node-10:B",
+        "partId": "node-10",
+        "partName": "SOLID",
+        "kind": "cylindrical_group",
+        "faceIds": [
+          "mesh-8:face-34"
+        ],
+        "geometryTypes": [
+          "cylinder"
+        ],
+        "faceCount": 1,
+        "areaTotal": 380.3075,
+        "primaryAxis": {
+          "origin": {
+            "x": 0,
+            "y": 68.58,
+            "z": 8.8773
+          },
+          "direction": {
+            "x": -0.0008999855238492723,
+            "y": -0.00559990992617325,
+            "z": 0.9999839153880804
+          },
+          "radius": 4.7464
+        }
+      },
+      "relationType": "insertable_coaxial_candidate",
+      "sharedAxis": {
+        "origin": {
+          "x": -0.0248,
+          "y": 68.579,
+          "z": 9.0353
+        },
+        "direction": {
+          "x": 0.013299534125479233,
+          "y": 0.12659556543501285,
+          "z": -0.9918652555686355
+        }
+      },
+      "bboxGap": 0,
+      "score": 0.9911,
+      "ruleEvidence": [
+        "axis_alignment=0.9926",
+        "axis_distance=0.0296",
+        "radius_similarity=0.9928",
+        "axis_alignment=0.9957",
+        "axis_distance=0.1009",
+        "radius_similarity=0.994",
+        "axis_alignment=0.9948",
+        "axis_distance=0.1896",
+        "radius_similarity=0.9935",
+        "axis_alignment=0.9987",
+        "axis_distance=0.0379",
+        "radius_similarity=0.9005"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-1:face-13",
+          "faceBId": "mesh-8:face-34",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9911,
+          "gap": 0.0296
+        },
+        {
+          "faceAId": "mesh-1:face-12",
+          "faceBId": "mesh-8:face-34",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9838,
+          "gap": 0.1009
+        },
+        {
+          "faceAId": "mesh-1:face-11",
+          "faceBId": "mesh-8:face-34",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9721,
+          "gap": 0.1896
+        },
+        {
+          "faceAId": "mesh-1:face-17",
+          "faceBId": "mesh-8:face-34",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9698,
+          "gap": 0.0379
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-4__node-10",
+      "order": 4,
+      "partAId": "node-4",
+      "partAName": "3/8-16 Socket Head Cap Screw v3 (1)",
+      "partBId": "node-10",
+      "partBName": "SOLID",
+      "featureGroupA": {
+        "featureId": "fg:node-4__node-10:A",
+        "partId": "node-4",
+        "partName": "3/8-16 Socket Head Cap Screw v3 (1)",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-2:face-32",
+          "mesh-2:face-7",
+          "mesh-2:face-6",
+          "mesh-2:face-31"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 4,
+        "areaTotal": 422.9872,
+        "primaryAxis": {
+          "origin": {
+            "x": -38.1514,
+            "y": 9.7368,
+            "z": -0.0033
+          },
+          "direction": {
+            "x": 0.004699833934301846,
+            "y": -0.9982647269390494,
+            "z": -0.058697925945429434
+          },
+          "radius": 4.7161
+        }
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-4__node-10:B",
+        "partId": "node-10",
+        "partName": "SOLID",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-8:face-43",
+          "mesh-8:face-44",
+          "mesh-8:face-9"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 3,
+        "areaTotal": 1051.2044,
+        "primaryAxis": {
+          "origin": {
+            "x": -38.1,
+            "y": 10.16,
+            "z": 0
+          },
+          "direction": {
+            "x": 0.00309997890471533,
+            "y": -0.9999931950694614,
+            "z": 0.001999986390138923
+          },
+          "radius": 5.0628
+        }
+      },
+      "relationType": "insertable_coaxial_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 0.9814,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=0",
+        "overlap=1",
+        "area_similarity=0.7676",
+        "axis_alignment=0.9982",
+        "axis_distance=0.0576",
+        "radius_similarity=0.9315",
+        "axis_alignment=0.992",
+        "axis_distance=0.0572",
+        "radius_similarity=0.9311",
+        "axis_alignment=1",
+        "axis_distance=0.1011"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-2:face-32",
+          "faceBId": "mesh-8:face-43",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9814,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-2:face-7",
+          "faceBId": "mesh-8:face-44",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9752,
+          "gap": 0.0576
+        },
+        {
+          "faceAId": "mesh-2:face-6",
+          "faceBId": "mesh-8:face-44",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9724,
+          "gap": 0.0572
+        },
+        {
+          "faceAId": "mesh-2:face-31",
+          "faceBId": "mesh-8:face-9",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9696,
+          "gap": 0.1011
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-5__node-10",
+      "order": 5,
+      "partAId": "node-5",
+      "partAName": "3/8-16 Socket Head Cap Screw v3 (2)",
+      "partBId": "node-10",
+      "partBName": "SOLID",
+      "featureGroupA": {
+        "featureId": "fg:node-5__node-10:A",
+        "partId": "node-5",
+        "partName": "3/8-16 Socket Head Cap Screw v3 (2)",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-3:face-32",
+          "mesh-3:face-7",
+          "mesh-3:face-6",
+          "mesh-3:face-5"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 4,
+        "areaTotal": 115.5154,
+        "primaryAxis": {
+          "origin": {
+            "x": 38.0486,
+            "y": 9.7368,
+            "z": -0.0033
+          },
+          "direction": {
+            "x": 0.004699833934301846,
+            "y": -0.9982647269390494,
+            "z": -0.058697925945429434
+          },
+          "radius": 4.7161
+        }
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-5__node-10:B",
+        "partId": "node-10",
+        "partName": "SOLID",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-8:face-47",
+          "mesh-8:face-48"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 2,
+        "areaTotal": 462.822,
+        "primaryAxis": {
+          "origin": {
+            "x": 38.1,
+            "y": 10.16,
+            "z": 0
+          },
+          "direction": {
+            "x": -9.999994950003828e-05,
+            "y": -0.9999994950003827,
+            "z": -0.0009999994950003826
+          },
+          "radius": 5.0628
+        }
+      },
+      "relationType": "insertable_coaxial_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 0.9814,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=0",
+        "overlap=1",
+        "area_similarity=0.7676",
+        "axis_alignment=0.9983",
+        "axis_distance=0.0576",
+        "radius_similarity=0.9315",
+        "axis_alignment=0.9924",
+        "axis_distance=0.0572",
+        "radius_similarity=0.9311",
+        "axis_alignment=0.9965",
+        "axis_distance=0.1108"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-3:face-32",
+          "faceBId": "mesh-8:face-47",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9814,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-3:face-7",
+          "faceBId": "mesh-8:face-48",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9753,
+          "gap": 0.0576
+        },
+        {
+          "faceAId": "mesh-3:face-6",
+          "faceBId": "mesh-8:face-48",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9726,
+          "gap": 0.0572
+        },
+        {
+          "faceAId": "mesh-3:face-5",
+          "faceBId": "mesh-8:face-48",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9682,
+          "gap": 0.1108
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-6__node-10",
+      "order": 6,
+      "partAId": "node-6",
+      "partAName": "3/8-16 Socket Head Cap Screw v3 (3)",
+      "partBId": "node-10",
+      "partBName": "SOLID",
+      "featureGroupA": {
+        "featureId": "fg:node-6__node-10:A",
+        "partId": "node-6",
+        "partName": "3/8-16 Socket Head Cap Screw v3 (3)",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-4:face-32",
+          "mesh-4:face-7",
+          "mesh-4:face-6",
+          "mesh-4:face-5"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 4,
+        "areaTotal": 115.5154,
+        "primaryAxis": {
+          "origin": {
+            "x": -0.0514,
+            "y": 9.7368,
+            "z": -38.1033
+          },
+          "direction": {
+            "x": 0.004699833934301846,
+            "y": -0.9982647269390494,
+            "z": -0.058697925945429434
+          },
+          "radius": 4.7161
+        }
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-6__node-10:B",
+        "partId": "node-10",
+        "partName": "SOLID",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-8:face-45",
+          "mesh-8:face-46"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 2,
+        "areaTotal": 462.822,
+        "primaryAxis": {
+          "origin": {
+            "x": 0,
+            "y": 10.16,
+            "z": -38.1
+          },
+          "direction": {
+            "x": -0.0002999975865291245,
+            "y": 0.9999919550970818,
+            "z": 0.003999967820388328
+          },
+          "radius": 5.0628
+        }
+      },
+      "relationType": "insertable_coaxial_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 0.9814,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=0",
+        "overlap=1",
+        "area_similarity=0.7676",
+        "axis_alignment=0.9985",
+        "axis_distance=0.0576",
+        "radius_similarity=0.9315",
+        "axis_alignment=0.9928",
+        "axis_distance=0.0572",
+        "radius_similarity=0.9311",
+        "axis_alignment=0.9968",
+        "axis_distance=0.1108"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-4:face-32",
+          "faceBId": "mesh-8:face-45",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9814,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-4:face-7",
+          "faceBId": "mesh-8:face-46",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9754,
+          "gap": 0.0576
+        },
+        {
+          "faceAId": "mesh-4:face-6",
+          "faceBId": "mesh-8:face-46",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9728,
+          "gap": 0.0572
+        },
+        {
+          "faceAId": "mesh-4:face-5",
+          "faceBId": "mesh-8:face-46",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9683,
+          "gap": 0.1108
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-7__node-10",
+      "order": 7,
+      "partAId": "node-7",
+      "partAName": "3/8-16 Socket Head Cap Screw v3 (4)",
+      "partBId": "node-10",
+      "partBName": "SOLID",
+      "featureGroupA": {
+        "featureId": "fg:node-7__node-10:A",
+        "partId": "node-7",
+        "partName": "3/8-16 Socket Head Cap Screw v3 (4)",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-5:face-32",
+          "mesh-5:face-7",
+          "mesh-5:face-6",
+          "mesh-5:face-5"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 4,
+        "areaTotal": 115.5154,
+        "primaryAxis": {
+          "origin": {
+            "x": -0.0514,
+            "y": 9.7368,
+            "z": 38.0967
+          },
+          "direction": {
+            "x": 0.004699833934301846,
+            "y": -0.9982647269390494,
+            "z": -0.058697925945429434
+          },
+          "radius": 4.7161
+        }
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-7__node-10:B",
+        "partId": "node-10",
+        "partName": "SOLID",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-8:face-41",
+          "mesh-8:face-42"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 2,
+        "areaTotal": 462.822,
+        "primaryAxis": {
+          "origin": {
+            "x": 0,
+            "y": 10.16,
+            "z": 38.1
+          },
+          "direction": {
+            "x": 0.0004999934351292949,
+            "y": -0.9999868702585897,
+            "z": 0.005099933038318808
+          },
+          "radius": 5.0628
+        }
+      },
+      "relationType": "insertable_coaxial_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 0.9814,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=0",
+        "overlap=1",
+        "area_similarity=0.7676",
+        "axis_alignment=0.998",
+        "axis_distance=0.0576",
+        "radius_similarity=0.9315",
+        "axis_alignment=0.9917",
+        "axis_distance=0.0572",
+        "radius_similarity=0.9311",
+        "axis_alignment=0.996",
+        "axis_distance=0.1108"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-5:face-32",
+          "faceBId": "mesh-8:face-41",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9814,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-5:face-7",
+          "faceBId": "mesh-8:face-42",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9751,
+          "gap": 0.0576
+        },
+        {
+          "faceAId": "mesh-5:face-6",
+          "faceBId": "mesh-8:face-42",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9722,
+          "gap": 0.0572
+        },
+        {
+          "faceAId": "mesh-5:face-5",
+          "faceBId": "mesh-8:face-42",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.968,
+          "gap": 0.1108
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-2__node-3",
+      "order": 8,
+      "partAId": "node-2",
+      "partAName": "Dovetail Clip v2",
+      "partBId": "node-3",
+      "partBName": "3/8-16 Socket Head Cap Screw v3",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-3:A",
+        "partId": "node-2",
+        "partName": "Dovetail Clip v2",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-0:face-14",
+          "mesh-0:face-16",
+          "mesh-0:face-15"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 3,
+        "areaTotal": 680.4554,
+        "primaryAxis": {
+          "origin": {
+            "x": 0,
+            "y": 68.58,
+            "z": 17.272
+          },
+          "direction": {
+            "x": -0.0041999627674950985,
+            "y": 0.00029999734053536416,
+            "z": -0.9999911351178806
+          },
+          "radius": 6.3285
+        }
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-3:B",
+        "partId": "node-3",
+        "partName": "3/8-16 Socket Head Cap Screw v3",
+        "kind": "mixed_mating_group",
+        "faceIds": [
+          "mesh-1:face-32",
+          "mesh-1:face-31",
+          "mesh-1:face-10"
+        ],
+        "geometryTypes": [
+          "plane",
+          "cylinder"
+        ],
+        "faceCount": 3,
+        "areaTotal": 420.0333,
+        "primaryAxis": {
+          "origin": {
+            "x": 0,
+            "y": 68.58,
+            "z": 22.804
+          },
+          "direction": {
+            "x": 0.0006999998285000631,
+            "y": 0,
+            "z": -0.9999997550000902
+          },
+          "radius": 7.5942
+        }
+      },
+      "relationType": "insertable_coaxial_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 0.9634,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=0",
+        "overlap=1",
+        "area_similarity=0.5424",
+        "axis_alignment=1",
+        "axis_distance=0.0233",
+        "radius_similarity=0.8333",
+        "axis_distance=0.0366",
+        "radius_similarity=0.7489",
+        "axis_alignment=0.9964",
+        "axis_distance=0.017",
+        "radius_similarity=0.7452"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-14",
+          "faceBId": "mesh-1:face-32",
+          "relation": "planar-coincident-candidate",
+          "score": 0.9634,
+          "gap": 0
+        },
+        {
+          "faceAId": "mesh-0:face-16",
+          "faceBId": "mesh-1:face-31",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9565,
+          "gap": 0.0233
+        },
+        {
+          "faceAId": "mesh-0:face-15",
+          "faceBId": "mesh-1:face-31",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9351,
+          "gap": 0.0366
+        },
+        {
+          "faceAId": "mesh-0:face-16",
+          "faceBId": "mesh-1:face-10",
+          "relation": "coaxial-cylinder-candidate",
+          "score": 0.9331,
+          "gap": 0.017
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-8__node-10",
+      "order": 9,
+      "partAId": "node-8",
+      "partAName": "1/8\" Pin v0",
+      "partBId": "node-10",
+      "partBName": "SOLID",
+      "featureGroupA": {
+        "featureId": "fg:node-8__node-10:A",
+        "partId": "node-8",
+        "partName": "1/8\" Pin v0",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-6:face-3",
+          "mesh-6:face-4",
+          "mesh-6:face-0",
+          "mesh-6:face-2"
+        ],
+        "geometryTypes": [
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 4,
+        "areaTotal": 163.0408,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-8__node-10:B",
+        "partId": "node-10",
+        "partName": "SOLID",
+        "kind": "cylindrical_group",
+        "faceIds": [
+          "mesh-8:face-24",
+          "mesh-8:face-28"
+        ],
+        "geometryTypes": [
+          "cylinder"
+        ],
+        "faceCount": 2,
+        "areaTotal": 4187.1217,
+        "primaryAxis": {
+          "origin": {
+            "x": -0.0887,
+            "y": 2.8494,
+            "z": 0.0887
+          },
+          "direction": {
+            "x": -0.0016999973310062853,
+            "y": 0.9999984300036973,
+            "z": -0.0004999992150018487
+          },
+          "radius": 18.9507
+        }
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 0,
+      "score": 0.892,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=2.54",
+        "overlap=1",
+        "area_similarity=0.0534",
+        "gap=2.8575",
+        "area_similarity=0.1005",
+        "gap=5.715",
+        "area_similarity=0.0077",
+        "gap=6.0325",
+        "area_similarity=0.0146"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-6:face-3",
+          "faceBId": "mesh-8:face-24",
+          "relation": "planar-coincident-candidate",
+          "score": 0.892,
+          "gap": 2.54
+        },
+        {
+          "faceAId": "mesh-6:face-4",
+          "faceBId": "mesh-8:face-24",
+          "relation": "planar-coincident-candidate",
+          "score": 0.8918,
+          "gap": 2.8575
+        },
+        {
+          "faceAId": "mesh-6:face-0",
+          "faceBId": "mesh-8:face-28",
+          "relation": "planar-coincident-candidate",
+          "score": 0.8481,
+          "gap": 5.715
+        },
+        {
+          "faceAId": "mesh-6:face-2",
+          "faceBId": "mesh-8:face-28",
+          "relation": "planar-coincident-candidate",
+          "score": 0.8446,
+          "gap": 6.0325
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-3__node-9",
+      "order": 10,
+      "partAId": "node-3",
+      "partAName": "3/8-16 Socket Head Cap Screw v3",
+      "partBId": "node-9",
+      "partBName": "1/8\" Pin v0 (1)",
+      "featureGroupA": {
+        "featureId": "fg:node-3__node-9:A",
+        "partId": "node-3",
+        "partName": "3/8-16 Socket Head Cap Screw v3",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-1:face-15",
+          "mesh-1:face-35",
+          "mesh-1:face-38"
+        ],
+        "geometryTypes": [
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 3,
+        "areaTotal": 43.6917,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-3__node-9:B",
+        "partId": "node-9",
+        "partName": "1/8\" Pin v0 (1)",
+        "kind": "plane_group",
+        "faceIds": [
+          "mesh-7:face-4",
+          "mesh-7:face-3",
+          "mesh-7:face-0"
+        ],
+        "geometryTypes": [
+          "plane",
+          "unknown"
+        ],
+        "faceCount": 3,
+        "areaTotal": 19.7568,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 6.2165,
+      "score": 0.8303,
+      "ruleEvidence": [
+        "normal_alignment=-0.9885",
+        "gap=0.4937",
+        "overlap=0.5",
+        "area_similarity=0.9881",
+        "gap=0.8076",
+        "area_similarity=0.3392",
+        "normal_alignment=-0.9939",
+        "gap=5.4333",
+        "area_similarity=0.4145",
+        "gap=5.2962"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-1:face-15",
+          "faceBId": "mesh-7:face-4",
+          "relation": "planar-coincident-candidate",
+          "score": 0.8303,
+          "gap": 0.4937
+        },
+        {
+          "faceAId": "mesh-1:face-15",
+          "faceBId": "mesh-7:face-3",
+          "relation": "planar-coincident-candidate",
+          "score": 0.7624,
+          "gap": 0.8076
+        },
+        {
+          "faceAId": "mesh-1:face-35",
+          "faceBId": "mesh-7:face-0",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6101,
+          "gap": 5.4333
+        },
+        {
+          "faceAId": "mesh-1:face-38",
+          "faceBId": "mesh-7:face-3",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6101,
+          "gap": 5.2962
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-2__node-7",
+      "order": 11,
+      "partAId": "node-2",
+      "partAName": "Dovetail Clip v2",
+      "partBId": "node-7",
+      "partBName": "3/8-16 Socket Head Cap Screw v3 (4)",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-7:A",
+        "partId": "node-2",
+        "partName": "Dovetail Clip v2",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-0:face-8",
+          "mesh-0:face-6"
+        ],
+        "geometryTypes": [
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 2,
+        "areaTotal": 569.1583,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-7:B",
+        "partId": "node-7",
+        "partName": "3/8-16 Socket Head Cap Screw v3 (4)",
+        "kind": "plane_group",
+        "faceIds": [
+          "mesh-5:face-34",
+          "mesh-5:face-41",
+          "mesh-5:face-42",
+          "mesh-5:face-44"
+        ],
+        "geometryTypes": [
+          "plane",
+          "unknown"
+        ],
+        "faceCount": 4,
+        "areaTotal": 580.5639,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 27.7588,
+      "score": 0.6771,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=28.8687",
+        "overlap=0.5",
+        "area_similarity=0.9633",
+        "gap=32.9327",
+        "area_similarity=0.6538",
+        "normal_alignment=-0.9999",
+        "gap=41.6187",
+        "area_similarity=0.4879",
+        "gap=71.79",
+        "area_similarity=0.4383"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-5:face-34",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6771,
+          "gap": 28.8687
+        },
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-5:face-41",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6523,
+          "gap": 32.9327
+        },
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-5:face-42",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6388,
+          "gap": 41.6187
+        },
+        {
+          "faceAId": "mesh-0:face-6",
+          "faceBId": "mesh-5:face-44",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6348,
+          "gap": 71.79
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-2__node-8",
+      "order": 12,
+      "partAId": "node-2",
+      "partAName": "Dovetail Clip v2",
+      "partBId": "node-8",
+      "partBName": "1/8\" Pin v0",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-8:A",
+        "partId": "node-2",
+        "partName": "Dovetail Clip v2",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-0:face-8",
+          "mesh-0:face-6"
+        ],
+        "geometryTypes": [
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 2,
+        "areaTotal": 569.1583,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-8:B",
+        "partId": "node-8",
+        "partName": "1/8\" Pin v0",
+        "kind": "plane_group",
+        "faceIds": [
+          "mesh-6:face-2",
+          "mesh-6:face-0",
+          "mesh-6:face-4",
+          "mesh-6:face-3"
+        ],
+        "geometryTypes": [
+          "plane",
+          "unknown"
+        ],
+        "faceCount": 4,
+        "areaTotal": 163.0408,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 32.2361,
+      "score": 0.6425,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=33.3475",
+        "overlap=0.5",
+        "area_similarity=0.5312",
+        "gap=33.665",
+        "area_similarity=0.282",
+        "gap=81.28",
+        "area_similarity=0.1136",
+        "gap=80.9625",
+        "area_similarity=0.0603"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-6:face-2",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6425,
+          "gap": 33.3475
+        },
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-6:face-0",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6226,
+          "gap": 33.665
+        },
+        {
+          "faceAId": "mesh-0:face-6",
+          "faceBId": "mesh-6:face-4",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6091,
+          "gap": 81.28
+        },
+        {
+          "faceAId": "mesh-0:face-6",
+          "faceBId": "mesh-6:face-3",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6048,
+          "gap": 80.9625
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-2__node-9",
+      "order": 13,
+      "partAId": "node-2",
+      "partAName": "Dovetail Clip v2",
+      "partBId": "node-9",
+      "partBName": "1/8\" Pin v0 (1)",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-9:A",
+        "partId": "node-2",
+        "partName": "Dovetail Clip v2",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-0:face-8",
+          "mesh-0:face-6"
+        ],
+        "geometryTypes": [
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 2,
+        "areaTotal": 569.1583,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-9:B",
+        "partId": "node-9",
+        "partName": "1/8\" Pin v0 (1)",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-7:face-0",
+          "mesh-7:face-2",
+          "mesh-7:face-3",
+          "mesh-7:face-4"
+        ],
+        "geometryTypes": [
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 4,
+        "areaTotal": 22.5926,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 8.7521,
+      "score": 0.6068,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=27.295",
+        "overlap=0.5",
+        "area_similarity=0.0844",
+        "gap=27.6125",
+        "area_similarity=0.0283",
+        "gap=11.7475",
+        "area_similarity=0.018",
+        "gap=12.065",
+        "area_similarity=0.006"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-7:face-0",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6068,
+          "gap": 27.295
+        },
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-7:face-2",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6023,
+          "gap": 27.6125
+        },
+        {
+          "faceAId": "mesh-0:face-6",
+          "faceBId": "mesh-7:face-3",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6014,
+          "gap": 11.7475
+        },
+        {
+          "faceAId": "mesh-0:face-6",
+          "faceBId": "mesh-7:face-4",
+          "relation": "planar-coincident-candidate",
+          "score": 0.6005,
+          "gap": 12.065
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-2__node-4",
+      "order": 14,
+      "partAId": "node-2",
+      "partAName": "Dovetail Clip v2",
+      "partBId": "node-4",
+      "partBName": "3/8-16 Socket Head Cap Screw v3 (1)",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-4:A",
+        "partId": "node-2",
+        "partName": "Dovetail Clip v2",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-0:face-8",
+          "mesh-0:face-12",
+          "mesh-0:face-13"
+        ],
+        "geometryTypes": [
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 3,
+        "areaTotal": 323.5939,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-4:B",
+        "partId": "node-4",
+        "partName": "3/8-16 Socket Head Cap Screw v3 (1)",
+        "kind": "planar_group",
+        "faceIds": [
+          "mesh-2:face-34",
+          "mesh-2:face-41"
+        ],
+        "geometryTypes": [
+          "plane"
+        ],
+        "faceCount": 2,
+        "areaTotal": 169.5923,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 29.2466,
+      "score": 0.5771,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=28.8871",
+        "overlap=0",
+        "area_similarity=0.9633",
+        "gap=33.64",
+        "area_similarity=0.9318",
+        "gap=32.9511",
+        "area_similarity=0.6538"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-2:face-34",
+          "relation": "planar-coincident-candidate",
+          "score": 0.5771,
+          "gap": 28.8871
+        },
+        {
+          "faceAId": "mesh-0:face-12",
+          "faceBId": "mesh-2:face-34",
+          "relation": "planar-coincident-candidate",
+          "score": 0.5745,
+          "gap": 33.64
+        },
+        {
+          "faceAId": "mesh-0:face-13",
+          "faceBId": "mesh-2:face-34",
+          "relation": "planar-coincident-candidate",
+          "score": 0.5745,
+          "gap": 33.64
+        },
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-2:face-41",
+          "relation": "planar-coincident-candidate",
+          "score": 0.5523,
+          "gap": 32.9511
+        }
+      ]
+    },
+    {
+      "candidateId": "relation:node-2__node-5",
+      "order": 15,
+      "partAId": "node-2",
+      "partAName": "Dovetail Clip v2",
+      "partBId": "node-5",
+      "partBName": "3/8-16 Socket Head Cap Screw v3 (2)",
+      "featureGroupA": {
+        "featureId": "fg:node-2__node-5:A",
+        "partId": "node-2",
+        "partName": "Dovetail Clip v2",
+        "kind": "unknown_group",
+        "faceIds": [
+          "mesh-0:face-8",
+          "mesh-0:face-12",
+          "mesh-0:face-13"
+        ],
+        "geometryTypes": [
+          "unknown",
+          "plane"
+        ],
+        "faceCount": 3,
+        "areaTotal": 323.5939,
+        "primaryAxis": null
+      },
+      "featureGroupB": {
+        "featureId": "fg:node-2__node-5:B",
+        "partId": "node-5",
+        "partName": "3/8-16 Socket Head Cap Screw v3 (2)",
+        "kind": "planar_group",
+        "faceIds": [
+          "mesh-3:face-34",
+          "mesh-3:face-41"
+        ],
+        "geometryTypes": [
+          "plane"
+        ],
+        "faceCount": 2,
+        "areaTotal": 169.5923,
+        "primaryAxis": null
+      },
+      "relationType": "planar_contact_candidate",
+      "sharedAxis": null,
+      "bboxGap": 29.2466,
+      "score": 0.5771,
+      "ruleEvidence": [
+        "normal_alignment=-1",
+        "gap=28.8879",
+        "overlap=0",
+        "area_similarity=0.9633",
+        "gap=33.64",
+        "area_similarity=0.9318",
+        "gap=32.9519",
+        "area_similarity=0.6538"
+      ],
+      "facePairs": [
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-3:face-34",
+          "relation": "planar-coincident-candidate",
+          "score": 0.5771,
+          "gap": 28.8879
+        },
+        {
+          "faceAId": "mesh-0:face-12",
+          "faceBId": "mesh-3:face-34",
+          "relation": "planar-coincident-candidate",
+          "score": 0.5745,
+          "gap": 33.64
+        },
+        {
+          "faceAId": "mesh-0:face-13",
+          "faceBId": "mesh-3:face-34",
+          "relation": "planar-coincident-candidate",
+          "score": 0.5745,
+          "gap": 33.64
+        },
+        {
+          "faceAId": "mesh-0:face-8",
+          "faceBId": "mesh-3:face-41",
+          "relation": "planar-coincident-candidate",
+          "score": 0.5523,
+          "gap": 32.9519
+        }
+      ]
+    }
+  ],
+  "baseCandidates": [
+    {
+      "partId": "node-10",
+      "name": "SOLID",
+      "score": 1,
+      "volumeScore": 1,
+      "supportAreaScore": 1,
+      "connectivityScore": 1,
+      "centerBias": 1,
+      "reasons": [
+        "large_volume",
+        "large_support_face",
+        "high_connectivity",
+        "spatially_central"
+      ]
+    },
+    {
+      "partId": "node-2",
+      "name": "Dovetail Clip v2",
+      "score": 0.3457,
+      "volumeScore": 0.0257,
+      "supportAreaScore": 0.0943,
+      "connectivityScore": 0.875,
+      "centerBias": 0.8078,
+      "reasons": [
+        "high_connectivity",
+        "spatially_central"
+      ]
+    },
+    {
+      "partId": "node-3",
+      "name": "3/8-16 Socket Head Cap Screw v3",
+      "score": 0,
+      "volumeScore": 0.0057,
+      "supportAreaScore": 0.0329,
+      "connectivityScore": 0.375,
+      "centerBias": 0.794,
+      "reasons": [
+        "spatially_central",
+        "fastener_like_penalty"
+      ]
+    },
+    {
+      "partId": "node-4",
+      "name": "3/8-16 Socket Head Cap Screw v3 (1)",
+      "score": 0,
+      "volumeScore": 0.0057,
+      "supportAreaScore": 0.0329,
+      "connectivityScore": 0.25,
+      "centerBias": 0.7037,
+      "reasons": [
+        "spatially_central",
+        "fastener_like_penalty"
+      ]
+    },
+    {
+      "partId": "node-5",
+      "name": "3/8-16 Socket Head Cap Screw v3 (2)",
+      "score": 0,
+      "volumeScore": 0.0057,
+      "supportAreaScore": 0.0329,
+      "connectivityScore": 0.25,
+      "centerBias": 0.7037,
+      "reasons": [
+        "spatially_central",
+        "fastener_like_penalty"
+      ]
+    },
+    {
+      "partId": "node-6",
+      "name": "3/8-16 Socket Head Cap Screw v3 (3)",
+      "score": 0,
+      "volumeScore": 0.0057,
+      "supportAreaScore": 0.0329,
+      "connectivityScore": 0.125,
+      "centerBias": 0.7037,
+      "reasons": [
+        "spatially_central",
+        "fastener_like_penalty"
+      ]
+    },
+    {
+      "partId": "node-7",
+      "name": "3/8-16 Socket Head Cap Screw v3 (4)",
+      "score": 0,
+      "volumeScore": 0.0057,
+      "supportAreaScore": 0.0329,
+      "connectivityScore": 0.25,
+      "centerBias": 0.7037,
+      "reasons": [
+        "spatially_central",
+        "fastener_like_penalty"
+      ]
+    },
+    {
+      "partId": "node-8",
+      "name": "1/8\" Pin v0",
+      "score": 0,
+      "volumeScore": 0.0021,
+      "supportAreaScore": 0.0523,
+      "connectivityScore": 0.25,
+      "centerBias": 0.8001,
+      "reasons": [
+        "spatially_central",
+        "fastener_like_penalty"
+      ]
+    }
+  ],
+  "subassemblyCandidates": [
+    {
+      "candidateId": "subassembly:node-9+node-10",
+      "partIds": [
+        "node-9",
+        "node-10"
+      ],
+      "score": 0.9999,
+      "internalScore": 0.9999,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-2+node-10",
+      "partIds": [
+        "node-2",
+        "node-10"
+      ],
+      "score": 0.9973,
+      "internalScore": 0.9973,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-3+node-10",
+      "partIds": [
+        "node-3",
+        "node-10"
+      ],
+      "score": 0.9911,
+      "internalScore": 0.9911,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-4+node-10",
+      "partIds": [
+        "node-4",
+        "node-10"
+      ],
+      "score": 0.9814,
+      "internalScore": 0.9814,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-5+node-10",
+      "partIds": [
+        "node-5",
+        "node-10"
+      ],
+      "score": 0.9814,
+      "internalScore": 0.9814,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-6+node-10",
+      "partIds": [
+        "node-6",
+        "node-10"
+      ],
+      "score": 0.9814,
+      "internalScore": 0.9814,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-7+node-10",
+      "partIds": [
+        "node-7",
+        "node-10"
+      ],
+      "score": 0.9814,
+      "internalScore": 0.9814,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-2+node-3",
+      "partIds": [
+        "node-2",
+        "node-3"
+      ],
+      "score": 0.9634,
+      "internalScore": 0.9634,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-8+node-10",
+      "partIds": [
+        "node-8",
+        "node-10"
+      ],
+      "score": 0.892,
+      "internalScore": 0.892,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-3+node-9",
+      "partIds": [
+        "node-3",
+        "node-9"
+      ],
+      "score": 0.8303,
+      "internalScore": 0.8303,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-2+node-7",
+      "partIds": [
+        "node-2",
+        "node-7"
+      ],
+      "score": 0.6771,
+      "internalScore": 0.6771,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-2+node-8",
+      "partIds": [
+        "node-2",
+        "node-8"
+      ],
+      "score": 0.6425,
+      "internalScore": 0.6425,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-2+node-9",
+      "partIds": [
+        "node-2",
+        "node-9"
+      ],
+      "score": 0.6068,
+      "internalScore": 0.6068,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-2+node-4",
+      "partIds": [
+        "node-2",
+        "node-4"
+      ],
+      "score": 0.5771,
+      "internalScore": 0.5771,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    },
+    {
+      "candidateId": "subassembly:node-2+node-5",
+      "partIds": [
+        "node-2",
+        "node-5"
+      ],
+      "score": 0.5771,
+      "internalScore": 0.5771,
+      "externalScore": 0,
+      "reasons": [
+        "strong_pair_relation"
+      ]
+    }
+  ],
+  "graspCandidates": [
+    {
+      "candidateId": "grasp:node-8:planar:mesh-6:face-2:mesh-6:face-4",
+      "partId": "node-8",
+      "partName": "1/8\" Pin v0",
+      "featureGroup": {
+        "featureId": "grip:node-8:planar:mesh-6:face-2:mesh-6:face-4",
+        "kind": "planar_grip_pair",
+        "faceIds": [
+          "mesh-6:face-2",
+          "mesh-6:face-4"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "parallel_jaw",
+        "soft_jaw"
+      ],
+      "approachDirections": [
+        {
+          "x": 0,
+          "y": 1,
+          "z": 0
+        },
+        {
+          "x": -2.553455465029116e-33,
+          "y": -1,
+          "z": -2.2241445511494254e-16
+        }
+      ],
+      "avoidFaceIds": [
+        "mesh-6:face-3",
+        "mesh-6:face-4",
+        "mesh-6:face-0",
+        "mesh-6:face-2"
+      ],
+      "score": 0.7017
+    },
+    {
+      "candidateId": "grasp:node-9:planar:mesh-7:face-2:mesh-7:face-4",
+      "partId": "node-9",
+      "partName": "1/8\" Pin v0 (1)",
+      "featureGroup": {
+        "featureId": "grip:node-9:planar:mesh-7:face-2:mesh-7:face-4",
+        "kind": "planar_grip_pair",
+        "faceIds": [
+          "mesh-7:face-2",
+          "mesh-7:face-4"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "parallel_jaw",
+        "soft_jaw"
+      ],
+      "approachDirections": [
+        {
+          "x": 0,
+          "y": 1,
+          "z": 0
+        },
+        {
+          "x": 0,
+          "y": -1,
+          "z": 0
+        }
+      ],
+      "avoidFaceIds": [
+        "mesh-7:face-1",
+        "mesh-7:face-3",
+        "mesh-7:face-4",
+        "mesh-7:face-0",
+        "mesh-7:face-2"
+      ],
+      "score": 0.7001
+    },
+    {
+      "candidateId": "grasp:node-3:planar:mesh-1:face-32:mesh-1:face-34",
+      "partId": "node-3",
+      "partName": "3/8-16 Socket Head Cap Screw v3",
+      "featureGroup": {
+        "featureId": "grip:node-3:planar:mesh-1:face-32:mesh-1:face-34",
+        "kind": "planar_grip_pair",
+        "faceIds": [
+          "mesh-1:face-32",
+          "mesh-1:face-34"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "parallel_jaw",
+        "soft_jaw"
+      ],
+      "approachDirections": [
+        {
+          "x": 2.135231046243447e-17,
+          "y": 5.597078914337142e-16,
+          "z": -1
+        },
+        {
+          "x": -9.102175407536979e-17,
+          "y": -5.726553986467967e-16,
+          "z": 1
+        }
+      ],
+      "avoidFaceIds": [
+        "mesh-1:face-13",
+        "mesh-1:face-12",
+        "mesh-1:face-11",
+        "mesh-1:face-17",
+        "mesh-1:face-32",
+        "mesh-1:face-31",
+        "mesh-1:face-10",
+        "mesh-1:face-15",
+        "mesh-1:face-35",
+        "mesh-1:face-38"
+      ],
+      "score": 0.6961
+    },
+    {
+      "candidateId": "grasp:node-4:planar:mesh-2:face-32:mesh-2:face-34",
+      "partId": "node-4",
+      "partName": "3/8-16 Socket Head Cap Screw v3 (1)",
+      "featureGroup": {
+        "featureId": "grip:node-4:planar:mesh-2:face-32:mesh-2:face-34",
+        "kind": "planar_grip_pair",
+        "faceIds": [
+          "mesh-2:face-32",
+          "mesh-2:face-34"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "parallel_jaw",
+        "soft_jaw"
+      ],
+      "approachDirections": [
+        {
+          "x": -5.575240150570791e-17,
+          "y": -1,
+          "z": 7.419315360347644e-16
+        },
+        {
+          "x": -5.657630253175402e-17,
+          "y": 1,
+          "z": -7.160484676050048e-16
+        }
+      ],
+      "avoidFaceIds": [
+        "mesh-2:face-32",
+        "mesh-2:face-7",
+        "mesh-2:face-6",
+        "mesh-2:face-31",
+        "mesh-2:face-34",
+        "mesh-2:face-41"
+      ],
+      "score": 0.6961
+    },
+    {
+      "candidateId": "grasp:node-5:planar:mesh-3:face-32:mesh-3:face-34",
+      "partId": "node-5",
+      "partName": "3/8-16 Socket Head Cap Screw v3 (2)",
+      "featureGroup": {
+        "featureId": "grip:node-5:planar:mesh-3:face-32:mesh-3:face-34",
+        "kind": "planar_grip_pair",
+        "faceIds": [
+          "mesh-3:face-32",
+          "mesh-3:face-34"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "parallel_jaw",
+        "soft_jaw"
+      ],
+      "approachDirections": [
+        {
+          "x": -4.5236844886477354e-17,
+          "y": -1,
+          "z": -6.184410119390384e-16
+        },
+        {
+          "x": 5.657630253175399e-17,
+          "y": 1,
+          "z": 7.160484676050046e-16
+        }
+      ],
+      "avoidFaceIds": [
+        "mesh-3:face-32",
+        "mesh-3:face-7",
+        "mesh-3:face-6",
+        "mesh-3:face-5",
+        "mesh-3:face-34",
+        "mesh-3:face-41"
+      ],
+      "score": 0.6961
+    },
+    {
+      "candidateId": "grasp:node-6:planar:mesh-4:face-32:mesh-4:face-34",
+      "partId": "node-6",
+      "partName": "3/8-16 Socket Head Cap Screw v3 (3)",
+      "featureGroup": {
+        "featureId": "grip:node-6:planar:mesh-4:face-32:mesh-4:face-34",
+        "kind": "planar_grip_pair",
+        "faceIds": [
+          "mesh-4:face-32",
+          "mesh-4:face-34"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "parallel_jaw",
+        "soft_jaw"
+      ],
+      "approachDirections": [
+        {
+          "x": -1.4964951327066637e-15,
+          "y": -1,
+          "z": 9.139027723835797e-17
+        },
+        {
+          "x": 1.5564624012722053e-15,
+          "y": 1,
+          "z": -1.311176153914192e-16
+        }
+      ],
+      "avoidFaceIds": [
+        "mesh-4:face-32",
+        "mesh-4:face-7",
+        "mesh-4:face-6",
+        "mesh-4:face-5"
+      ],
+      "score": 0.6961
+    },
+    {
+      "candidateId": "grasp:node-7:planar:mesh-5:face-32:mesh-5:face-34",
+      "partId": "node-7",
+      "partName": "3/8-16 Socket Head Cap Screw v3 (4)",
+      "featureGroup": {
+        "featureId": "grip:node-7:planar:mesh-5:face-32:mesh-5:face-34",
+        "kind": "planar_grip_pair",
+        "faceIds": [
+          "mesh-5:face-32",
+          "mesh-5:face-34"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "parallel_jaw",
+        "soft_jaw"
+      ],
+      "approachDirections": [
+        {
+          "x": 1.3876430690635348e-15,
+          "y": -1,
+          "z": 6.661336522702811e-17
+        },
+        {
+          "x": -1.4998860987404537e-15,
+          "y": 1,
+          "z": 6.486844558735173e-17
+        }
+      ],
+      "avoidFaceIds": [
+        "mesh-5:face-32",
+        "mesh-5:face-7",
+        "mesh-5:face-6",
+        "mesh-5:face-5",
+        "mesh-5:face-34",
+        "mesh-5:face-41",
+        "mesh-5:face-42",
+        "mesh-5:face-44"
+      ],
+      "score": 0.6961
+    },
+    {
+      "candidateId": "grasp:node-10:planar:mesh-8:face-27:mesh-8:face-38",
+      "partId": "node-10",
+      "partName": "SOLID",
+      "featureGroup": {
+        "featureId": "grip:node-10:planar:mesh-8:face-27:mesh-8:face-38",
+        "kind": "planar_grip_pair",
+        "faceIds": [
+          "mesh-8:face-27",
+          "mesh-8:face-38"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "parallel_jaw",
+        "soft_jaw"
+      ],
+      "approachDirections": [
+        {
+          "x": 2.9802321599441388e-31,
+          "y": -1,
+          "z": -8.446042267433196e-16
+        },
+        {
+          "x": 4.061317051613625e-31,
+          "y": 1,
+          "z": 5.815801560095138e-17
+        }
+      ],
+      "avoidFaceIds": [
+        "mesh-8:face-36",
+        "mesh-8:face-35",
+        "mesh-8:face-38",
+        "mesh-8:face-32",
+        "mesh-8:face-37",
+        "mesh-8:face-15",
+        "mesh-8:face-11",
+        "mesh-8:face-34",
+        "mesh-8:face-43",
+        "mesh-8:face-44",
+        "mesh-8:face-9"
+      ],
+      "score": 0.6559
+    },
+    {
+      "candidateId": "grasp:node-2:planar:mesh-0:face-6:mesh-0:face-4",
+      "partId": "node-2",
+      "partName": "Dovetail Clip v2",
+      "featureGroup": {
+        "featureId": "grip:node-2:planar:mesh-0:face-6:mesh-0:face-4",
+        "kind": "planar_grip_pair",
+        "faceIds": [
+          "mesh-0:face-6",
+          "mesh-0:face-4"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "parallel_jaw",
+        "soft_jaw"
+      ],
+      "approachDirections": [
+        {
+          "x": 1.6150179801107803e-31,
+          "y": 1,
+          "z": 8.788866767075728e-16
+        },
+        {
+          "x": 0,
+          "y": -0.707106781186547,
+          "z": -0.707106781186548
+        }
+      ],
+      "avoidFaceIds": [
+        "mesh-0:face-12",
+        "mesh-0:face-13",
+        "mesh-0:face-7",
+        "mesh-0:face-10",
+        "mesh-0:face-14",
+        "mesh-0:face-16",
+        "mesh-0:face-15",
+        "mesh-0:face-8",
+        "mesh-0:face-6"
+      ],
+      "score": 0.4779
+    },
+    {
+      "candidateId": "grasp:node-10:cylinder:mesh-8:face-28",
+      "partId": "node-10",
+      "partName": "SOLID",
+      "featureGroup": {
+        "featureId": "grip:node-10:cylinder:mesh-8:face-28",
+        "kind": "cylindrical_grip_band",
+        "faceIds": [
+          "mesh-8:face-28"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "soft_jaw",
+        "parallel_jaw"
+      ],
+      "approachDirections": [],
+      "referenceAxis": {
+        "x": 0.002499991737540961,
+        "y": -0.9999966950163844,
+        "z": 0.0005999980170098306
+      },
+      "avoidFaceIds": [
+        "mesh-8:face-36",
+        "mesh-8:face-35",
+        "mesh-8:face-38",
+        "mesh-8:face-32",
+        "mesh-8:face-37",
+        "mesh-8:face-15",
+        "mesh-8:face-11",
+        "mesh-8:face-34",
+        "mesh-8:face-43",
+        "mesh-8:face-44",
+        "mesh-8:face-9"
+      ],
+      "score": 0.302
+    },
+    {
+      "candidateId": "grasp:node-8:cylinder:mesh-6:face-1",
+      "partId": "node-8",
+      "partName": "1/8\" Pin v0",
+      "featureGroup": {
+        "featureId": "grip:node-8:cylinder:mesh-6:face-1",
+        "kind": "cylindrical_grip_band",
+        "faceIds": [
+          "mesh-6:face-1"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "collet",
+        "soft_jaw"
+      ],
+      "approachDirections": [],
+      "referenceAxis": {
+        "x": -0.00029999997300000366,
+        "y": 0.9999999100000122,
+        "z": 0.00029999997300000366
+      },
+      "avoidFaceIds": [
+        "mesh-6:face-3",
+        "mesh-6:face-4",
+        "mesh-6:face-0",
+        "mesh-6:face-2"
+      ],
+      "score": 0.184
+    },
+    {
+      "candidateId": "grasp:node-3:cylinder:mesh-1:face-31",
+      "partId": "node-3",
+      "partName": "3/8-16 Socket Head Cap Screw v3",
+      "featureGroup": {
+        "featureId": "grip:node-3:cylinder:mesh-1:face-31",
+        "kind": "cylindrical_grip_band",
+        "faceIds": [
+          "mesh-1:face-31"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "collet",
+        "soft_jaw"
+      ],
+      "approachDirections": [],
+      "referenceAxis": {
+        "x": 0.0006999998285000631,
+        "y": 0,
+        "z": -0.9999997550000902
+      },
+      "avoidFaceIds": [
+        "mesh-1:face-13",
+        "mesh-1:face-12",
+        "mesh-1:face-11",
+        "mesh-1:face-17",
+        "mesh-1:face-32",
+        "mesh-1:face-31",
+        "mesh-1:face-10",
+        "mesh-1:face-15",
+        "mesh-1:face-35",
+        "mesh-1:face-38"
+      ],
+      "score": 0.1714
+    },
+    {
+      "candidateId": "grasp:node-4:cylinder:mesh-2:face-31",
+      "partId": "node-4",
+      "partName": "3/8-16 Socket Head Cap Screw v3 (1)",
+      "featureGroup": {
+        "featureId": "grip:node-4:cylinder:mesh-2:face-31",
+        "kind": "cylindrical_grip_band",
+        "faceIds": [
+          "mesh-2:face-31"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "collet",
+        "soft_jaw"
+      ],
+      "approachDirections": [],
+      "referenceAxis": {
+        "x": 0.0014999975625059414,
+        "y": -0.999998375003961,
+        "z": 0.000999998375003961
+      },
+      "avoidFaceIds": [
+        "mesh-2:face-32",
+        "mesh-2:face-7",
+        "mesh-2:face-6",
+        "mesh-2:face-31",
+        "mesh-2:face-34",
+        "mesh-2:face-41"
+      ],
+      "score": 0.1714
+    },
+    {
+      "candidateId": "grasp:node-5:cylinder:mesh-3:face-31",
+      "partId": "node-5",
+      "partName": "3/8-16 Socket Head Cap Screw v3 (2)",
+      "featureGroup": {
+        "featureId": "grip:node-5:cylinder:mesh-3:face-31",
+        "kind": "cylindrical_grip_band",
+        "faceIds": [
+          "mesh-3:face-31"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "collet",
+        "soft_jaw"
+      ],
+      "approachDirections": [],
+      "referenceAxis": {
+        "x": 0.0013999985160023595,
+        "y": -0.9999989400016853,
+        "z": 0.0003999995760006742
+      },
+      "avoidFaceIds": [
+        "mesh-3:face-32",
+        "mesh-3:face-7",
+        "mesh-3:face-6",
+        "mesh-3:face-5",
+        "mesh-3:face-34",
+        "mesh-3:face-41"
+      ],
+      "score": 0.1714
+    },
+    {
+      "candidateId": "grasp:node-6:cylinder:mesh-4:face-31",
+      "partId": "node-6",
+      "partName": "3/8-16 Socket Head Cap Screw v3 (3)",
+      "featureGroup": {
+        "featureId": "grip:node-6:cylinder:mesh-4:face-31",
+        "kind": "cylindrical_grip_band",
+        "faceIds": [
+          "mesh-4:face-31"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "collet",
+        "soft_jaw"
+      ],
+      "approachDirections": [],
+      "referenceAxis": {
+        "x": -0.0006999997410001437,
+        "y": -0.9999996300002053,
+        "z": 0.0004999998150001027
+      },
+      "avoidFaceIds": [
+        "mesh-4:face-32",
+        "mesh-4:face-7",
+        "mesh-4:face-6",
+        "mesh-4:face-5"
+      ],
+      "score": 0.1714
+    },
+    {
+      "candidateId": "grasp:node-7:cylinder:mesh-5:face-31",
+      "partId": "node-7",
+      "partName": "3/8-16 Socket Head Cap Screw v3 (4)",
+      "featureGroup": {
+        "featureId": "grip:node-7:cylinder:mesh-5:face-31",
+        "kind": "cylindrical_grip_band",
+        "faceIds": [
+          "mesh-5:face-31"
+        ]
+      },
+      "recommendedGripperTypes": [
+        "collet",
+        "soft_jaw"
+      ],
+      "approachDirections": [],
+      "referenceAxis": {
+        "x": -0.000799999680000192,
+        "y": -0.9999996000002399,
+        "z": -0.000399999840000096
+      },
+      "avoidFaceIds": [
+        "mesh-5:face-32",
+        "mesh-5:face-7",
+        "mesh-5:face-6",
+        "mesh-5:face-5",
+        "mesh-5:face-34",
+        "mesh-5:face-41",
+        "mesh-5:face-42",
+        "mesh-5:face-44"
+      ],
+      "score": 0.1714
+    }
+  ]
+}

@@ -52,6 +52,10 @@ function toVector3(vector = { x: 0, y: 0, z: 0 }) {
   return new THREE.Vector3(vector.x || 0, vector.y || 0, vector.z || 0);
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function createReasoningOverlayState() {
   return {
     focusPartIds: [],
@@ -93,6 +97,48 @@ function indexToMaskHex(index) {
   return `#${value.toString(16).padStart(6, "0")}`;
 }
 
+function indexToPaletteMaskHex(index) {
+  const color = new THREE.Color();
+  color.setHSL((((index * 137.508) % 360) + 360) % 360 / 360, 0.74, 0.52);
+  return `#${color.getHexString()}`;
+}
+
+function indexToVlmPaletteHex(index) {
+  const color = new THREE.Color();
+  color.setHSL((((index * 137.508) % 360) + 360) % 360 / 360, 0.92, 0.58);
+  return `#${color.getHexString()}`;
+}
+
+function maskModeBase(mode = "") {
+  if (String(mode).startsWith("face-mask")) {
+    return "face-mask";
+  }
+  if (String(mode).startsWith("id-mask")) {
+    return "id-mask";
+  }
+  return mode;
+}
+
+function maskModeUsesPalette(mode = "") {
+  return String(mode).endsWith("-palette");
+}
+
+function normalizeImageFormat(mode, requestedFormat = "png") {
+  if (maskModeBase(mode) === "id-mask" || maskModeBase(mode) === "face-mask") {
+    return "png";
+  }
+  const normalized = String(requestedFormat || "png").toLowerCase();
+  return normalized === "jpg" || normalized === "jpeg" ? "jpeg" : "png";
+}
+
+function imageMimeType(format = "png") {
+  return format === "jpeg" ? "image/jpeg" : "image/png";
+}
+
+function imageExtension(format = "png") {
+  return format === "jpeg" ? "jpeg" : "png";
+}
+
 export class WorkbenchViewer {
   constructor({ canvas, onObjectPick, onHintChange }) {
     this.canvas = canvas;
@@ -102,12 +148,21 @@ export class WorkbenchViewer {
     this.meshRecords = new Map();
     this.nodeMap = new Map();
     this.nodeMaskColors = new Map();
+    this.nodeMaskPaletteColors = new Map();
+    this.nodeVlmPaletteColors = new Map();
+    this.faceMaskColors = new Map();
+    this.faceMaskPaletteColors = new Map();
+    this.faceVlmPaletteColors = new Map();
     this.hovered = null;
     this.selection = null;
     this.state = {
       selectionMode: "part",
       hiddenNodeIds: new Set(),
       isolatedNodeIds: null,
+      nodeOpacityMap: {},
+      nodeTranslationMap: {},
+      faceMapTargetPartIds: [],
+      displayMode: "beauty",
       section: {
         enabled: false,
         axis: "x",
@@ -395,13 +450,30 @@ export class WorkbenchViewer {
     this.sceneData = sceneData;
     this.nodeMap = new Map(sceneData.nodes.map((node) => [node.id, node]));
     this.nodeMaskColors = new Map();
+    this.nodeMaskPaletteColors = new Map();
+    this.nodeVlmPaletteColors = new Map();
+    this.faceMaskColors = new Map();
+    this.faceMaskPaletteColors = new Map();
+    this.faceVlmPaletteColors = new Map();
     this.disposeSceneObjects();
 
     sceneData.nodes
       .filter((node) => node.kind === "part")
       .forEach((node, index) => {
         this.nodeMaskColors.set(node.id, indexToMaskHex(index));
+        this.nodeMaskPaletteColors.set(node.id, indexToPaletteMaskHex(index));
+        this.nodeVlmPaletteColors.set(node.id, indexToVlmPaletteHex(index));
       });
+
+    let nextFaceMaskIndex = 0;
+    sceneData.meshes.forEach((meshData) => {
+      (meshData.brepFaces || []).forEach((face) => {
+        this.faceMaskColors.set(face.id, indexToMaskHex(nextFaceMaskIndex));
+        this.faceMaskPaletteColors.set(face.id, indexToPaletteMaskHex(nextFaceMaskIndex));
+        this.faceVlmPaletteColors.set(face.id, indexToVlmPaletteHex(nextFaceMaskIndex));
+        nextFaceMaskIndex += 1;
+      });
+    });
 
     sceneData.meshes.forEach((meshData) => {
       const geometry = new THREE.BufferGeometry();
@@ -436,6 +508,7 @@ export class WorkbenchViewer {
         meshData,
         node: this.nodeMap.get(meshData.nodeId),
         maskColorHex: this.nodeMaskColors.get(meshData.nodeId) || "#000001",
+        maskPaletteColorHex: this.nodeMaskPaletteColors.get(meshData.nodeId) || "#66ccff",
         baseColors: (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((material) =>
           material.color.clone(),
         ),
@@ -504,6 +577,19 @@ export class WorkbenchViewer {
       hiddenNodeIds: partialState.hiddenNodeIds || this.state.hiddenNodeIds,
       isolatedNodeIds:
         partialState.isolatedNodeIds === undefined ? this.state.isolatedNodeIds : partialState.isolatedNodeIds,
+      nodeOpacityMap:
+        partialState.nodeOpacityMap === undefined
+          ? this.state.nodeOpacityMap
+          : { ...(partialState.nodeOpacityMap || {}) },
+      nodeTranslationMap:
+        partialState.nodeTranslationMap === undefined
+          ? this.state.nodeTranslationMap
+          : { ...(partialState.nodeTranslationMap || {}) },
+      faceMapTargetPartIds:
+        partialState.faceMapTargetPartIds === undefined
+          ? this.state.faceMapTargetPartIds
+          : [...new Set(partialState.faceMapTargetPartIds || [])],
+      displayMode: partialState.displayMode === undefined ? this.state.displayMode : partialState.displayMode,
       section: {
         ...this.state.section,
         ...(partialState.section || {}),
@@ -530,6 +616,11 @@ export class WorkbenchViewer {
     const focusSet = new Set(overlay.focusPartIds || []);
     const baseFaceSet = new Set(overlay.baseFaceIds || []);
     const assemblingFaceSet = new Set(overlay.assemblingFaceIds || []);
+    const nodeOpacityMap = this.state.nodeOpacityMap || {};
+    const nodeTranslationMap = this.state.nodeTranslationMap || {};
+    const displayMode = this.state.displayMode || "beauty";
+    const faceMapTargetSet = new Set(this.state.faceMapTargetPartIds || []);
+    const useTargetedFaceMap = displayMode === "face-map" && faceMapTargetSet.size > 0;
 
     this.meshRecords.forEach((record) => {
       const visibleByHidden = !this.state.hiddenNodeIds.has(record.meshData.nodeId);
@@ -549,6 +640,46 @@ export class WorkbenchViewer {
       });
       record.edges.material.color.set(0x263244);
       record.edges.material.opacity = 0.35;
+
+      if (displayMode === "face-map" && (!useTargetedFaceMap || faceMapTargetSet.has(record.meshData.nodeId))) {
+        const fallbackColor = new THREE.Color(
+          this.nodeVlmPaletteColors.get(record.meshData.nodeId) ||
+            this.nodeMaskPaletteColors.get(record.meshData.nodeId) ||
+            "#66ccff",
+        );
+        materials.forEach((material) => {
+          material.color.copy(fallbackColor);
+          material.emissive = fallbackColor.clone();
+          material.emissiveIntensity = 0.22;
+        });
+        if (record.meshData.brepFaces?.length) {
+          (record.meshData.brepFaces || []).forEach((face) => {
+            const material = materials[face.materialIndex || 0];
+            if (!material) {
+              return;
+            }
+            const faceColor = new THREE.Color(
+              this.faceVlmPaletteColors.get(face.id) ||
+                this.faceMaskPaletteColors.get(face.id) ||
+                "#66ccff",
+            );
+            material.color.copy(faceColor);
+            material.emissive = faceColor.clone();
+            material.emissiveIntensity = 0.3;
+          });
+        }
+        record.edges.material.color.set(0x0f1724);
+        record.edges.material.opacity = 0.06;
+      } else if (displayMode === "face-map" && useTargetedFaceMap) {
+        materials.forEach((material, index) => {
+          material.color.copy(record.baseColors[index] || record.baseColors[0]);
+          material.emissive = new THREE.Color(0x000000);
+          material.emissiveIntensity = 0;
+          material.transparent = true;
+          material.opacity = 0.08;
+        });
+        record.edges.material.opacity = 0.04;
+      }
 
       if (focusSet.size && !focusSet.has(record.meshData.nodeId)) {
         materials.forEach((material) => {
@@ -608,27 +739,30 @@ export class WorkbenchViewer {
           material.emissiveIntensity = 0.18;
         }
       });
+
+      const customOpacity = nodeOpacityMap[record.meshData.nodeId];
+      if (customOpacity != null) {
+        const opacity = clamp(Number(customOpacity) || 0, 0.05, 1);
+        materials.forEach((material) => {
+          material.transparent = opacity < 0.999 || material.transparent;
+          material.opacity = opacity;
+        });
+        record.edges.material.opacity = clamp(Math.max(opacity * 0.9, 0.08), 0.08, 1);
+      }
+
+      const translation = nodeTranslationMap[record.meshData.nodeId] || { x: 0, y: 0, z: 0 };
+      record.mesh.position.set(translation.x || 0, translation.y || 0, translation.z || 0);
+      record.edges.position.set(translation.x || 0, translation.y || 0, translation.z || 0);
     });
 
     this.renderReasoningOverlay();
     this.render();
   }
   fit() {
-    const bounds = this.sceneData?.bounds;
-    if (!bounds) {
+    if (!this.sceneData?.bounds) {
       return;
     }
-    const center = new THREE.Vector3(bounds.center.x, bounds.center.y, bounds.center.z);
-    const size = new THREE.Vector3(bounds.size.x, bounds.size.y, bounds.size.z);
-    const radius = Math.max(size.length() * 0.55, 20);
-    const direction = VIEW_DIRECTIONS.iso.clone();
-    this.controls.target.copy(center);
-    this.camera.position.copy(center.clone().addScaledVector(direction, radius * 2.2));
-    this.camera.near = Math.max(radius / 500, 0.1);
-    this.camera.far = Math.max(radius * 20, 5000);
-    this.camera.updateProjectionMatrix();
-    this.controls.update();
-    this.render();
+    this.setCameraToBounds(this.sceneData.bounds);
   }
 
   setViewPreset(preset) {
@@ -648,9 +782,47 @@ export class WorkbenchViewer {
     this.render();
   }
 
+  setCameraToBounds(bounds) {
+    if (!bounds) {
+      return;
+    }
+    const center = new THREE.Vector3(bounds.center.x, bounds.center.y, bounds.center.z);
+    const size = new THREE.Vector3(bounds.size.x, bounds.size.y, bounds.size.z);
+    const radius = Math.max(size.length() * 0.55, 20);
+    const direction = VIEW_DIRECTIONS.iso.clone();
+    this.controls.target.copy(center);
+    this.camera.position.copy(center.clone().addScaledVector(direction, radius * 2.2));
+    this.camera.near = Math.max(radius / 500, 0.1);
+    this.camera.far = Math.max(radius * 20, 5000);
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+    this.render();
+  }
+
   getColorMap(mode = "display") {
     if (!this.sceneData) {
       return [];
+    }
+
+    const baseMode = maskModeBase(mode);
+    const usePalette = maskModeUsesPalette(mode);
+
+    if (baseMode === "face-mask") {
+      return [...this.meshRecords.values()].flatMap((record) =>
+        (record.meshData.brepFaces || []).map((face) => ({
+          faceId: face.id,
+          faceName: face.name,
+          meshId: record.meshData.id,
+          nodeId: record.meshData.nodeId,
+          partId: record.meshData.nodeId,
+          partName: record.node?.name || record.meshData.nodeId,
+          colorHex:
+            usePalette
+              ? this.faceMaskPaletteColors.get(face.id) || "#66ccff"
+              : this.faceMaskColors.get(face.id) || "#000001",
+          visible: Boolean(record.mesh?.visible),
+        })),
+      );
     }
 
     return this.sceneData.nodes
@@ -663,8 +835,10 @@ export class WorkbenchViewer {
           partId: node.id,
           name: node.name,
           colorHex:
-            mode === "id-mask"
-              ? this.nodeMaskColors.get(node.id) || "#000001"
+            baseMode === "id-mask"
+              ? usePalette
+                ? this.nodeMaskPaletteColors.get(node.id) || "#66ccff"
+                : this.nodeMaskColors.get(node.id) || "#000001"
               : record?.meshData?.color || node.color || "#8aa6d1",
           visible: Boolean(record?.mesh?.visible),
         };
@@ -727,8 +901,17 @@ export class WorkbenchViewer {
     const previousAspect = this.camera.aspect;
     const targetWidth = Math.max(1, options.width || previousSize.x || this.canvas.width || 1);
     const targetHeight = Math.max(1, options.height || previousSize.y || this.canvas.height || 1);
+    const format = normalizeImageFormat(mode, options.format);
+    const mimeType = imageMimeType(format);
+    const quality =
+      typeof options.quality === "number"
+        ? Math.max(0.1, Math.min(1, options.quality))
+        : 0.92;
+    const snapshot = this.snapshot();
 
-    if (options.fit) {
+    if (options.preset) {
+      this.setViewPreset(options.preset);
+    } else if (options.fit) {
       this.fit();
     }
 
@@ -737,24 +920,134 @@ export class WorkbenchViewer {
     this.camera.updateProjectionMatrix();
 
     let dataUrl;
-    if (mode === "id-mask") {
-      dataUrl = this.captureMaskFrame();
+    if (maskModeBase(mode) === "id-mask" || maskModeBase(mode) === "face-mask") {
+      dataUrl = this.captureMaskFrame(mode);
     } else {
       this.render();
-      dataUrl = this.canvas.toDataURL("image/png");
+      dataUrl = this.canvas.toDataURL(mimeType, quality);
     }
 
     this.renderer.setSize(previousSize.x, previousSize.y, false);
     this.camera.aspect = previousAspect;
     this.camera.updateProjectionMatrix();
+    this.restore(snapshot);
     this.render();
 
     return {
       dataUrl,
-      mimeType: "image/png",
+      mimeType,
       width: targetWidth,
       height: targetHeight,
-      colorMap: this.getColorMap(mode === "id-mask" ? "id-mask" : "display"),
+      format,
+      preset: options.preset || null,
+      colorMap: this.getColorMap(maskModeBase(mode) === "id-mask" || maskModeBase(mode) === "face-mask" ? mode : "display"),
+    };
+  }
+
+  async captureMultiView(mode = "beauty", options = {}) {
+    const presets = Array.isArray(options.presets) && options.presets.length
+      ? options.presets
+      : ["front", "left", "top", "right", "back", "bottom"];
+    const snapshot = this.snapshot();
+    const views = [];
+
+    for (const preset of presets) {
+      const artifact = this.capture(mode, {
+        ...options,
+        preset,
+        fit: false,
+      });
+      views.push({
+        preset,
+        ...artifact,
+      });
+    }
+
+    this.restore(snapshot);
+    return {
+      mode,
+      views,
+    };
+  }
+
+  async captureCandidateOverlay(overlay = {}, options = {}) {
+    if (!this.sceneData) {
+      throw new Error("当前没有可捕获的装配体。");
+    }
+
+    const previousSize = new THREE.Vector2();
+    this.renderer.getSize(previousSize);
+    const previousAspect = this.camera.aspect;
+    const previousOverlay = {
+      ...createReasoningOverlayState(),
+      ...(this.state.reasoningOverlay || {}),
+    };
+    const previousIsolatedNodeIds = this.state.isolatedNodeIds;
+    const previousDisplayMode = this.state.displayMode;
+    const width = Math.max(1, options.width || previousSize.x || this.canvas.width || 1);
+    const height = Math.max(1, options.height || previousSize.y || this.canvas.height || 1);
+    const focusNodeIds = new Set(overlay.focusPartIds || []);
+
+    const visibilitySnapshot = [...this.meshRecords.values()].map((record) => ({
+      record,
+      meshVisible: record.mesh.visible,
+      edgesVisible: record.edges.visible,
+      meshPosition: record.mesh.position.clone(),
+      edgePosition: record.edges.position.clone(),
+    }));
+
+    this.state.reasoningOverlay = {
+      ...createReasoningOverlayState(),
+      ...overlay,
+    };
+    this.state.isolatedNodeIds = focusNodeIds.size ? new Set(focusNodeIds) : previousIsolatedNodeIds;
+    this.state.displayMode = "beauty";
+
+    if (options.fit !== false) {
+      const focusBounds = focusNodeIds.size
+        ? unionBounds(
+            this.sceneData.nodes
+              .filter((node) => focusNodeIds.has(node.id) && node.bbox)
+              .map((node) => node.bbox),
+          )
+        : null;
+      if (focusBounds) {
+        this.setCameraToBounds(focusBounds);
+      } else {
+        this.fit();
+      }
+    }
+
+    this.renderer.setSize(width, height, false);
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.applyVisualState();
+
+    const overlayDataUrl = this.canvas.toDataURL("image/png");
+    const faceMaskDataUrl = this.captureMaskFrame("face-mask");
+    const faceColorMap = this.getColorMap("face-mask");
+
+    visibilitySnapshot.forEach((snapshot) => {
+      snapshot.record.mesh.visible = snapshot.meshVisible;
+      snapshot.record.edges.visible = snapshot.edgesVisible;
+      snapshot.record.mesh.position.copy(snapshot.meshPosition);
+      snapshot.record.edges.position.copy(snapshot.edgePosition);
+    });
+
+    this.renderer.setSize(previousSize.x, previousSize.y, false);
+    this.camera.aspect = previousAspect;
+    this.camera.updateProjectionMatrix();
+    this.state.isolatedNodeIds = previousIsolatedNodeIds;
+    this.state.reasoningOverlay = previousOverlay;
+    this.state.displayMode = previousDisplayMode;
+    this.applyVisualState();
+
+    return {
+      overlayDataUrl,
+      faceMaskDataUrl,
+      faceColorMap,
+      width,
+      height,
     };
   }
 
@@ -766,6 +1059,7 @@ export class WorkbenchViewer {
     const previousSize = new THREE.Vector2();
     this.renderer.getSize(previousSize);
     const previousAspect = this.camera.aspect;
+    const previousDisplayMode = this.state.displayMode;
     const width = Math.max(1, options.width || previousSize.x || this.canvas.width || 1);
     const height = Math.max(1, options.height || previousSize.y || this.canvas.height || 1);
 
@@ -783,6 +1077,7 @@ export class WorkbenchViewer {
       record.mesh.visible = visible;
       record.edges.visible = visible;
     });
+    this.state.displayMode = "beauty";
 
     if (options.fit !== false) {
       this.fit();
@@ -824,6 +1119,7 @@ export class WorkbenchViewer {
     this.renderer.setSize(previousSize.x, previousSize.y, false);
     this.camera.aspect = previousAspect;
     this.camera.updateProjectionMatrix();
+    this.state.displayMode = previousDisplayMode;
     this.applyVisualState();
 
     return {
@@ -837,7 +1133,9 @@ export class WorkbenchViewer {
     };
   }
 
-  captureMaskFrame() {
+  captureMaskFrame(mode = "id-mask") {
+    const baseMode = maskModeBase(mode);
+    const usePalette = maskModeUsesPalette(mode);
     const previousBackground = this.scene.background;
     this.scene.background = new THREE.Color(0x000000);
     this.grid.visible = false;
@@ -858,16 +1156,42 @@ export class WorkbenchViewer {
         })),
       });
 
-      const maskColor = new THREE.Color(record.maskColorHex);
+      const maskColor =
+        baseMode === "face-mask"
+          ? new THREE.Color(0x000000)
+          : new THREE.Color(
+              usePalette
+                ? record.maskPaletteColorHex || record.maskColorHex
+                : record.maskColorHex,
+            );
       materials.forEach((material) => {
         material.color.copy(maskColor);
         if (material.emissive) {
-          material.emissive.set(0x000000);
-          material.emissiveIntensity = 0;
+          material.emissive.copy(maskColor);
+          material.emissiveIntensity = 1;
         }
         material.transparent = false;
         material.opacity = 1;
       });
+
+      if (baseMode === "face-mask") {
+        (record.meshData.brepFaces || []).forEach((face) => {
+          const material = materials[face.materialIndex || 0];
+          if (!material) {
+            return;
+          }
+          const faceColor = new THREE.Color(
+            usePalette
+              ? this.faceMaskPaletteColors.get(face.id) || "#66ccff"
+              : this.faceMaskColors.get(face.id) || "#000001",
+          );
+          material.color.copy(faceColor);
+          if (material.emissive) {
+            material.emissive.copy(faceColor);
+            material.emissiveIntensity = 1;
+          }
+        });
+      }
       record.edges.visible = false;
     });
 
@@ -897,6 +1221,20 @@ export class WorkbenchViewer {
     return dataUrl;
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

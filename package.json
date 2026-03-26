@@ -6,7 +6,8 @@
   "main": "main.js",
   "scripts": {
     "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
-    "mcp:stdio": "node mcp/stdio-server.js"
+    "mcp:stdio": "node mcp/stdio-server.js",
+    "mcp:test:evidence:http": "node mcp/test-evidence-bundle-http.js"
   },
   "devDependencies": {
     "electron": "30"

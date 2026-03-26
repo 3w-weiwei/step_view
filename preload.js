@@ -3,6 +3,7 @@
 let mcpCaptureHandler = null;
 let mcpCommandHandler = null;
 let mcpServerStatusListener = null;
+let vlmAgentProgressListener = null;
 
 ipcRenderer.on("mcp:capture:request", async (_event, payload) => {
   if (!mcpCaptureHandler) {
@@ -62,6 +63,12 @@ ipcRenderer.on("mcp:server-status", (_event, payload) => {
   }
 });
 
+ipcRenderer.on("vlm:agent-progress", (_event, payload) => {
+  if (typeof vlmAgentProgressListener === "function") {
+    vlmAgentProgressListener(payload);
+  }
+});
+
 contextBridge.exposeInMainWorld("cadViewerApi", {
   pickStepFiles() {
     return ipcRenderer.invoke("system:pick-step-files");
@@ -92,6 +99,9 @@ contextBridge.exposeInMainWorld("cadViewerApi", {
   },
   getMcpServerStatus() {
     return ipcRenderer.invoke("mcp:server-status:get");
+  },
+  runVlmAgentAnalysis(payload) {
+    return ipcRenderer.invoke("vlm:analyze", payload);
   },
   getReasoningSummary(projectId) {
     return ipcRenderer.invoke("reasoning:summary", projectId);
@@ -135,6 +145,14 @@ contextBridge.exposeInMainWorld("cadViewerApi", {
     return () => {
       if (mcpServerStatusListener === callback) {
         mcpServerStatusListener = null;
+      }
+    };
+  },
+  onVlmAgentProgress(callback) {
+    vlmAgentProgressListener = callback;
+    return () => {
+      if (vlmAgentProgressListener === callback) {
+        vlmAgentProgressListener = null;
       }
     };
   },

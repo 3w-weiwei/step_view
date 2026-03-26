@@ -27,6 +27,11 @@ const PANEL_META = {
     title: "显示控制",
     description: "控制对象显隐与隔离范围，便于聚焦复杂装配中的局部区域。",
   },
+  agent: {
+    icon: "AG",
+    title: "智能体流程",
+    description: "在模型工作台中查看 VLM Agent 的工具调用过程、阶段和结论。",
+  },
   section: {
     icon: "SC",
     title: "剖切分析",
@@ -83,6 +88,40 @@ function createEmptyReasoningOverlay() {
   };
 }
 
+function createEmptyAgentAnalysisState(previous = null) {
+  return {
+    status: previous?.status || "idle",
+    error: previous?.error || "",
+    startedAt: previous?.startedAt || "",
+    finishedAt: previous?.finishedAt || "",
+    model: previous?.model || "",
+    endpoint: previous?.endpoint || "",
+    summary: previous?.summary || "",
+    confidence: Number.isFinite(Number(previous?.confidence)) ? Number(previous.confidence) : 0,
+    timeline: Array.isArray(previous?.timeline) ? previous.timeline : [],
+    selectedTimelineIndex: Number.isFinite(Number(previous?.selectedTimelineIndex))
+      ? Number(previous.selectedTimelineIndex)
+      : -1,
+    suggestions: Array.isArray(previous?.suggestions) ? previous.suggestions : [],
+    usage: previous?.usage || null,
+    evidence: previous?.evidence || null,
+    contextStats: previous?.contextStats || null,
+    processLog: Array.isArray(previous?.processLog) ? previous.processLog : [],
+    toolStages: Array.isArray(previous?.toolStages) ? previous.toolStages : [],
+    raw: previous?.raw || null,
+    instruction: previous?.instruction || "",
+    chatInput: previous?.chatInput || "",
+    chatMessages: Array.isArray(previous?.chatMessages) ? previous.chatMessages : [],
+    partQuery: previous?.partQuery || "",
+    opacityValue: Number.isFinite(Number(previous?.opacityValue)) ? Number(previous.opacityValue) : 0.45,
+    faceMapEnabled: Boolean(previous?.faceMapEnabled),
+    moveDirectionX: Number.isFinite(Number(previous?.moveDirectionX)) ? Number(previous.moveDirectionX) : 0,
+    moveDirectionY: Number.isFinite(Number(previous?.moveDirectionY)) ? Number(previous.moveDirectionY) : 0,
+    moveDirectionZ: Number.isFinite(Number(previous?.moveDirectionZ)) ? Number(previous.moveDirectionZ) : 1,
+    moveDistance: Number.isFinite(Number(previous?.moveDistance)) ? Number(previous.moveDistance) : 10,
+  };
+}
+
 function createReasoningDataState(previousData = null) {
   return {
     summary: previousData?.summary || null,
@@ -96,9 +135,12 @@ function createReasoningDataState(previousData = null) {
     stepExplanation: previousData?.stepExplanation || null,
     stepPreview: previousData?.stepPreview || null,
     stepPreviewError: previousData?.stepPreviewError || "",
+    stepVisualEvidence: previousData?.stepVisualEvidence || null,
+    stepVisualEvidenceError: previousData?.stepVisualEvidenceError || "",
     constraintsOverlay: previousData?.constraintsOverlay || createEmptyReasoningOverlay(),
     transformOverlay: previousData?.transformOverlay || createEmptyReasoningOverlay(),
     stepOverlay: previousData?.stepOverlay || createEmptyReasoningOverlay(),
+    agentAnalysis: createEmptyAgentAnalysisState(previousData?.agentAnalysis),
   };
 }
 
@@ -160,6 +202,7 @@ async function bootstrap() {
   state.route = parseRoute();
   api.onProjectUpdate(handleProjectUpdate);
   api.onMcpServerStatus?.(handleMcpServerStatus);
+  api.onVlmAgentProgress?.(handleVlmAgentProgress);
   registerMcpBridge();
 
   root.addEventListener("click", handleClick);
@@ -193,6 +236,48 @@ function handleMcpServerStatus(payload) {
     }
   }
 }
+
+function handleVlmAgentProgress(payload) {
+  if (!payload || !state.workbench || !state.activeProject) {
+    return;
+  }
+  if (payload.projectId !== state.activeProject.manifest.projectId) {
+    return;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  if (payload.status === "running" || payload.status === "finalizing") {
+    agent.status = "running";
+  } else if (payload.status === "ready") {
+    agent.status = "ready";
+  }
+  if (payload.startedAt) {
+    agent.startedAt = payload.startedAt;
+  }
+  if (payload.model) {
+    agent.model = payload.model;
+  }
+  if (payload.instruction) {
+    agent.instruction = payload.instruction;
+  }
+  if (Array.isArray(payload.processLog)) {
+    agent.processLog = payload.processLog;
+  }
+  if (Array.isArray(payload.toolStages)) {
+    agent.toolStages = payload.toolStages;
+  }
+  if (payload.summary) {
+    agent.summary = payload.summary;
+  }
+  if (Array.isArray(payload.timeline) && !agent.timeline.length) {
+    agent.timeline = payload.timeline;
+  }
+  if (Array.isArray(payload.suggestions) && !agent.suggestions.length) {
+    agent.suggestions = payload.suggestions;
+  }
+
+  render({ preserveBoundInput: true });
+}
 function registerMcpBridge() {
   if (!api?.registerMcpCaptureHandler) {
     return;
@@ -203,12 +288,29 @@ function registerMcpBridge() {
       throw new Error("当前没有活动工作台，无法截图。");
     }
 
-    const mode = payload?.mode === "id-mask" ? "id-mask" : "beauty";
-    const capture = await state.viewer.capture(mode, {
-      width: payload?.width,
-      height: payload?.height,
-      fit: payload?.fit,
-    });
+    const mode =
+      payload?.mode === "id-mask"
+        ? "id-mask"
+        : payload?.mode === "face-mask"
+          ? "face-mask"
+          : "beauty";
+    const capture = Array.isArray(payload?.presets) && payload.presets.length
+      ? await state.viewer.captureMultiView(mode, {
+          width: payload?.width,
+          height: payload?.height,
+          fit: payload?.fit,
+          presets: payload?.presets,
+          format: payload?.format,
+          quality: payload?.quality,
+        })
+      : await state.viewer.capture(mode, {
+          width: payload?.width,
+          height: payload?.height,
+          fit: payload?.fit,
+          preset: payload?.preset,
+          format: payload?.format,
+          quality: payload?.quality,
+        });
 
     return {
       ...capture,
@@ -238,10 +340,14 @@ function buildMcpStatePayload() {
         selectionMode: state.workbench.selectionMode,
         section: state.workbench.section || null,
         isolation: state.workbench.isolatedNodeIds ? Array.from(state.workbench.isolatedNodeIds) : [],
+        displayMode: state.workbench.displayMode || "beauty",
+        faceMapTargetPartIds: state.workbench.faceMapTargetPartIds || [],
+        translations: state.workbench.nodeTranslationMap || {},
         camera: state.viewer?.snapshot?.() || null,
         colorMaps: {
           display: state.viewer?.getColorMap?.("display") || [],
           "id-mask": state.viewer?.getColorMap?.("id-mask") || [],
+          "face-mask": state.viewer?.getColorMap?.("face-mask") || [],
         },
       }
     : {
@@ -250,10 +356,14 @@ function buildMcpStatePayload() {
         selection: null,
         section: null,
         isolation: [],
+        displayMode: "beauty",
+        faceMapTargetPartIds: [],
+        translations: {},
         camera: null,
         colorMaps: {
           display: [],
           "id-mask": [],
+          "face-mask": [],
         },
       };
 }
@@ -266,7 +376,380 @@ function publishMcpState() {
   api.publishMcpState(buildMcpStatePayload());
 }
 
+function cloneReasoningOverlayStateForCapture(overlay) {
+  return {
+    ...createEmptyReasoningOverlay(),
+    ...(overlay || {}),
+  };
+}
+
+function cloneSectionStateForCapture(section) {
+  return {
+    enabled: Boolean(section?.enabled),
+    axis: section?.axis || "x",
+    offset: Number.isFinite(Number(section?.offset)) ? Number(section.offset) : 0,
+  };
+}
+
+function buildBoundsFromPartIds(partIds = []) {
+  if (!state.activeProject) {
+    return null;
+  }
+
+  const boundsList = Array.from(new Set(partIds))
+    .map((partId) => state.activeProject.nodeMap.get(partId)?.bbox)
+    .filter(Boolean);
+
+  if (!boundsList.length) {
+    return state.activeProject.assembly?.bounds || null;
+  }
+
+  const first = boundsList[0];
+  const min = { ...first.min };
+  const max = { ...first.max };
+
+  boundsList.slice(1).forEach((bbox) => {
+    min.x = Math.min(min.x, bbox.min.x);
+    min.y = Math.min(min.y, bbox.min.y);
+    min.z = Math.min(min.z, bbox.min.z);
+    max.x = Math.max(max.x, bbox.max.x);
+    max.y = Math.max(max.y, bbox.max.y);
+    max.z = Math.max(max.z, bbox.max.z);
+  });
+
+  return {
+    min,
+    max,
+    center: {
+      x: (min.x + max.x) / 2,
+      y: (min.y + max.y) / 2,
+      z: (min.z + max.z) / 2,
+    },
+    size: {
+      x: max.x - min.x,
+      y: max.y - min.y,
+      z: max.z - min.z,
+    },
+  };
+}
+
+function createViewerCaptureSnapshot() {
+  return {
+    camera: state.viewer?.snapshot?.() || null,
+    hiddenNodeIds: new Set(state.viewer?.state?.hiddenNodeIds || state.workbench?.hiddenNodeIds || []),
+    isolatedNodeIds:
+      state.viewer?.state?.isolatedNodeIds == null
+        ? null
+        : new Set(state.viewer.state.isolatedNodeIds),
+    nodeOpacityMap: { ...(state.viewer?.state?.nodeOpacityMap || state.workbench?.nodeOpacityMap || {}) },
+    nodeTranslationMap: { ...(state.viewer?.state?.nodeTranslationMap || state.workbench?.nodeTranslationMap || {}) },
+    faceMapTargetPartIds: [...(state.viewer?.state?.faceMapTargetPartIds || state.workbench?.faceMapTargetPartIds || [])],
+    displayMode: state.viewer?.state?.displayMode || state.workbench?.displayMode || "beauty",
+    section: cloneSectionStateForCapture(state.viewer?.state?.section || state.workbench?.section),
+    reasoningOverlay: cloneReasoningOverlayStateForCapture(state.viewer?.state?.reasoningOverlay),
+    selection: state.workbench?.selection || null,
+  };
+}
+
+function applyViewerCaptureState(snapshot, overrides = {}) {
+  if (!state.viewer || !state.workbench) {
+    return;
+  }
+
+  state.viewer.updateState({
+    selectionMode: state.workbench.selectionMode,
+    hiddenNodeIds: overrides.hiddenNodeIds === undefined ? snapshot.hiddenNodeIds : overrides.hiddenNodeIds,
+    isolatedNodeIds: overrides.isolatedNodeIds === undefined ? snapshot.isolatedNodeIds : overrides.isolatedNodeIds,
+    nodeOpacityMap: overrides.nodeOpacityMap === undefined ? snapshot.nodeOpacityMap : overrides.nodeOpacityMap,
+    nodeTranslationMap:
+      overrides.nodeTranslationMap === undefined ? snapshot.nodeTranslationMap : overrides.nodeTranslationMap,
+    faceMapTargetPartIds:
+      overrides.faceMapTargetPartIds === undefined ? snapshot.faceMapTargetPartIds : overrides.faceMapTargetPartIds,
+    displayMode: overrides.displayMode === undefined ? snapshot.displayMode : overrides.displayMode,
+    section: overrides.section === undefined ? snapshot.section : overrides.section,
+    reasoningOverlay: overrides.reasoningOverlay === undefined ? snapshot.reasoningOverlay : overrides.reasoningOverlay,
+  });
+  state.viewer.setSelection(snapshot.selection || null);
+}
+
+function captureViewerArtifact(mode, options = {}) {
+  const artifact = state.viewer.capture(mode, {
+    width: options.width,
+    height: options.height,
+    fit: false,
+    preset: options.preset,
+  });
+
+  return {
+    name: options.name || options.preset || mode,
+    label: options.label || null,
+    preset: options.preset || null,
+    axis: options.axis || null,
+    offset: options.offset ?? null,
+    dataUrl: artifact.dataUrl,
+    mimeType: artifact.mimeType,
+    width: artifact.width,
+    height: artifact.height,
+    colorMap: artifact.colorMap || [],
+  };
+}
+
+async function captureMcpEvidenceBundle(payload) {
+  if (!state.viewer || !state.activeProject || !state.workbench) {
+    throw new Error("当前没有活动工作台，无法生成证据包。");
+  }
+
+  const target = payload?.target || {};
+  const width = Math.max(64, Number(payload?.width) || 960);
+  const height = Math.max(64, Number(payload?.height) || 720);
+  const focusPartIds = Array.from(new Set(target.partIds || target.overlay?.focusPartIds || []));
+  const overlay = payload?.includeOverlay === false
+    ? createEmptyReasoningOverlay()
+    : {
+        ...createEmptyReasoningOverlay(),
+        ...(target.overlay || {}),
+      };
+  const transparentContext = payload?.includeTransparentContext === true;
+  const focusBounds = buildBoundsFromPartIds(focusPartIds);
+  const snapshot = createViewerCaptureSnapshot();
+  const images = {
+    globalBeautyViews: [],
+    globalPartMaskViews: [],
+    globalPartMaskRawViews: [],
+    localOverlayViews: [],
+    localFaceMaskViews: [],
+    localFaceMaskRawViews: [],
+    sectionViews: [],
+  };
+  const colorMaps = {
+    partMask: [],
+    partMaskRaw: [],
+    partMaskPalette: [],
+    faceMask: [],
+    faceMaskRaw: [],
+    faceMaskPalette: [],
+  };
+
+  const focusIsolation = focusPartIds.length && !transparentContext ? new Set(focusPartIds) : null;
+  const globalSection = {
+    ...snapshot.section,
+    enabled: false,
+  };
+
+  try {
+    const globalPresets = ["front", "top", "iso"];
+
+    if (payload?.includeGlobalViews !== false) {
+      applyViewerCaptureState(snapshot, {
+        hiddenNodeIds: new Set(),
+        isolatedNodeIds: null,
+        displayMode: "beauty",
+        section: globalSection,
+        reasoningOverlay: createEmptyReasoningOverlay(),
+      });
+
+      globalPresets.forEach((preset) => {
+        images.globalBeautyViews.push(
+          captureViewerArtifact("beauty", {
+            name: `global_${preset}`,
+            preset,
+            width,
+            height,
+            label: `global-${preset}`,
+          }),
+        );
+      });
+    }
+
+    if (payload?.includePartMask !== false) {
+      applyViewerCaptureState(snapshot, {
+        hiddenNodeIds: new Set(),
+        isolatedNodeIds: null,
+        displayMode: "beauty",
+        section: globalSection,
+        reasoningOverlay: createEmptyReasoningOverlay(),
+      });
+
+      globalPresets.forEach((preset) => {
+        const paletteArtifact = captureViewerArtifact("id-mask-palette", {
+          name: `part_mask_${preset}`,
+          preset,
+          width,
+          height,
+          label: `part-mask-${preset}`,
+        });
+        const rawArtifact = captureViewerArtifact("id-mask", {
+          name: `part_mask_raw_${preset}`,
+          preset,
+          width,
+          height,
+          label: `part-mask-raw-${preset}`,
+        });
+        images.globalPartMaskViews.push(paletteArtifact);
+        images.globalPartMaskRawViews.push(rawArtifact);
+        if (!colorMaps.partMaskPalette.length && paletteArtifact.colorMap?.length) {
+          colorMaps.partMaskPalette = paletteArtifact.colorMap;
+          colorMaps.partMask = paletteArtifact.colorMap;
+        }
+        if (!colorMaps.partMaskRaw.length && rawArtifact.colorMap?.length) {
+          colorMaps.partMaskRaw = rawArtifact.colorMap;
+        }
+      });
+    }
+
+    if (payload?.includeLocalViews !== false) {
+      applyViewerCaptureState(snapshot, {
+        hiddenNodeIds: new Set(),
+        isolatedNodeIds: focusIsolation,
+        displayMode: "beauty",
+        section: globalSection,
+        reasoningOverlay: overlay,
+      });
+      if (focusBounds) {
+        state.viewer.setCameraToBounds(focusBounds);
+      } else {
+        state.viewer.fit();
+      }
+
+      if (payload?.includeOverlay !== false) {
+        images.localOverlayViews.push(
+          captureViewerArtifact("beauty", {
+            name: "local_overlay_focus",
+            width,
+            height,
+            label: "local-overlay-focus",
+          }),
+        );
+      }
+
+      if (payload?.includeFaceMask !== false) {
+        const paletteArtifact = captureViewerArtifact("face-mask-palette", {
+          name: "local_face_mask_focus",
+          width,
+          height,
+          label: "local-face-mask-focus",
+        });
+        const rawArtifact = captureViewerArtifact("face-mask", {
+          name: "local_face_mask_raw_focus",
+          width,
+          height,
+          label: "local-face-mask-raw-focus",
+        });
+        images.localFaceMaskViews.push(paletteArtifact);
+        images.localFaceMaskRawViews.push(rawArtifact);
+        if (paletteArtifact.colorMap?.length) {
+          colorMaps.faceMaskPalette = paletteArtifact.colorMap;
+          colorMaps.faceMask = paletteArtifact.colorMap;
+        }
+        if (rawArtifact.colorMap?.length) {
+          colorMaps.faceMaskRaw = rawArtifact.colorMap;
+        }
+      }
+    }
+
+    if (payload?.includeSectionViews === true) {
+      ["x", "y", "z"].forEach((axis) => {
+        const offset = focusBounds?.center?.[axis] ?? state.activeProject.assembly?.bounds?.center?.[axis] ?? 0;
+        applyViewerCaptureState(snapshot, {
+          hiddenNodeIds: new Set(),
+          isolatedNodeIds: focusIsolation,
+          displayMode: "beauty",
+          section: {
+            enabled: true,
+            axis,
+            offset,
+          },
+          reasoningOverlay: overlay,
+        });
+        if (focusBounds) {
+          state.viewer.setCameraToBounds(focusBounds);
+        } else {
+          state.viewer.fit();
+        }
+        images.sectionViews.push(
+          captureViewerArtifact("beauty", {
+            name: `section_${axis}_mid`,
+            width,
+            height,
+            axis,
+            offset,
+            label: `section-${axis}-mid`,
+          }),
+        );
+      });
+    }
+  } finally {
+    applyViewerCaptureState(snapshot, snapshot);
+    if (snapshot.camera) {
+      state.viewer.restore(snapshot.camera);
+    }
+  }
+
+  return {
+    target: {
+      ...target,
+      partIds: focusPartIds,
+    },
+    images,
+    colorMaps,
+    metadata: {
+      width,
+      height,
+      transparentContext,
+      focusPartIds,
+      focusFaceIds: target.focusFaceIds || [],
+      sectionAxes: images.sectionViews.map((item) => item.axis).filter(Boolean),
+    },
+  };
+}
+
+async function ensureWorkbenchForMcp(projectId) {
+  let resolvedProjectId = projectId || state.activeProject?.manifest?.projectId || state.route.projectId || null;
+
+  if (!resolvedProjectId) {
+    state.projects = await api.listProjects();
+    resolvedProjectId = state.projects.find((project) => project.status === "ready")?.projectId || null;
+  }
+
+  if (!resolvedProjectId) {
+    throw new Error("当前没有可用于 MCP 的 ready 项目。");
+  }
+
+  const needsLoad =
+    state.route.page !== "workbench" ||
+    state.route.projectId !== resolvedProjectId ||
+    state.activeProject?.manifest?.projectId !== resolvedProjectId ||
+    !state.workbench;
+
+  if (needsLoad) {
+    state.route = { page: "workbench", projectId: resolvedProjectId };
+    await loadProject(resolvedProjectId);
+  } else if (!state.viewer) {
+    render();
+  }
+
+  if (!state.viewer) {
+    render();
+  }
+
+  await new Promise((resolve) => {
+    window.setTimeout(resolve, needsLoad ? 200 : 50);
+  });
+
+  if (!state.viewer || !state.activeProject || !state.workbench) {
+    throw new Error("MCP 工作台上下文尚未准备完成。");
+  }
+
+  return resolvedProjectId;
+}
+
 async function executeMcpCommand(payload) {
+  const action = payload.action;
+  if (action === "capture-evidence-bundle") {
+    await ensureWorkbenchForMcp(payload?.projectId);
+    return captureMcpEvidenceBundle(payload || {});
+  }
+
   if (state.route.page !== "workbench" || !state.activeProject || !state.workbench) {
     throw new Error("当前没有活动工作台，无法执行 MCP 交互命令。");
   }
@@ -275,7 +758,6 @@ async function executeMcpCommand(payload) {
     throw new Error("当前工作台中的项目与目标 projectId 不一致。");
   }
 
-  const action = payload.action;
   switch (action) {
     case "isolate-parts": {
       const rawPartIds = Array.isArray(payload.partIds) ? payload.partIds : [];
@@ -308,6 +790,114 @@ async function executeMcpCommand(payload) {
     }
     case "clear-section-plane": {
       state.workbench.section.enabled = false;
+      break;
+    }
+    case "agent-focus-parts": {
+      const validPartIds = (Array.isArray(payload.partIds) ? payload.partIds : []).filter(
+        (partId) => state.activeProject.nodeMap.get(partId)?.kind === "part",
+      );
+      if (!validPartIds.length) {
+        throw new Error("没有可聚焦的零件 ID。");
+      }
+      state.workbench.hiddenNodeIds = new Set();
+      state.workbench.isolatedNodeIds = new Set(validPartIds);
+      break;
+    }
+    case "agent-hide-parts": {
+      const validPartIds = (Array.isArray(payload.partIds) ? payload.partIds : []).filter(
+        (partId) => state.activeProject.nodeMap.get(partId)?.kind === "part",
+      );
+      if (!validPartIds.length) {
+        throw new Error("没有可隐藏的零件 ID。");
+      }
+      const nextHidden = new Set(state.workbench.hiddenNodeIds);
+      validPartIds.forEach((partId) => nextHidden.add(partId));
+      state.workbench.hiddenNodeIds = nextHidden;
+      state.workbench.isolatedNodeIds = null;
+      break;
+    }
+    case "agent-set-opacity": {
+      const validPartIds = (Array.isArray(payload.partIds) ? payload.partIds : []).filter(
+        (partId) => state.activeProject.nodeMap.get(partId)?.kind === "part",
+      );
+      if (!validPartIds.length) {
+        throw new Error("没有可设置透明度的零件 ID。");
+      }
+      const opacity = Math.max(0.05, Math.min(1, Number(payload.opacity) || 1));
+      const nextOpacityMap = { ...(state.workbench.nodeOpacityMap || {}) };
+      validPartIds.forEach((partId) => {
+        if (opacity >= 0.999) {
+          delete nextOpacityMap[partId];
+        } else {
+          nextOpacityMap[partId] = opacity;
+        }
+      });
+      state.workbench.nodeOpacityMap = nextOpacityMap;
+      break;
+    }
+    case "agent-set-face-map": {
+      const validPartIds = (Array.isArray(payload.partIds) ? payload.partIds : []).filter(
+        (partId) => state.activeProject.nodeMap.get(partId)?.kind === "part",
+      );
+      if (!validPartIds.length) {
+        throw new Error("没有可显示面映射的零件 ID。");
+      }
+      state.workbench.displayMode = "face-map";
+      state.workbench.faceMapTargetPartIds = validPartIds;
+      break;
+    }
+    case "agent-disable-face-map": {
+      state.workbench.displayMode = "beauty";
+      state.workbench.faceMapTargetPartIds = [];
+      break;
+    }
+    case "agent-reset-display": {
+      state.workbench.hiddenNodeIds = new Set();
+      state.workbench.isolatedNodeIds = null;
+      state.workbench.displayMode = "beauty";
+      state.workbench.faceMapTargetPartIds = [];
+      break;
+    }
+    case "agent-translate-parts": {
+      const validPartIds = (Array.isArray(payload.partIds) ? payload.partIds : []).filter(
+        (partId) => state.activeProject.nodeMap.get(partId)?.kind === "part",
+      );
+      if (!validPartIds.length) {
+        throw new Error("没有可移动的零件 ID。");
+      }
+      const direction = payload.direction || {};
+      const dx = Number(direction.x) || 0;
+      const dy = Number(direction.y) || 0;
+      const dz = Number(direction.z) || 0;
+      const distance = Math.abs(Number(payload.distance) || 0);
+      if (!distance) {
+        throw new Error("移动距离无效。");
+      }
+      const nextTranslationMap = { ...(state.workbench.nodeTranslationMap || {}) };
+      validPartIds.forEach((partId) => {
+        const current = nextTranslationMap[partId] || { x: 0, y: 0, z: 0 };
+        nextTranslationMap[partId] = {
+          x: (current.x || 0) + dx * distance,
+          y: (current.y || 0) + dy * distance,
+          z: (current.z || 0) + dz * distance,
+        };
+      });
+      state.workbench.nodeTranslationMap = nextTranslationMap;
+      break;
+    }
+    case "agent-reset-translation-parts": {
+      const validPartIds = (Array.isArray(payload.partIds) ? payload.partIds : []).filter(
+        (partId) => state.activeProject.nodeMap.get(partId)?.kind === "part",
+      );
+      if (!validPartIds.length) {
+        state.workbench.nodeTranslationMap = {};
+      } else {
+        const nextTranslationMap = { ...(state.workbench.nodeTranslationMap || {}) };
+        validPartIds.forEach((partId) => {
+          delete nextTranslationMap[partId];
+        });
+        state.workbench.nodeTranslationMap = nextTranslationMap;
+      }
       break;
     }
     case "capture-step-preview": {
@@ -423,13 +1013,20 @@ function createWorkbenchState(project, previousState) {
     projectId: project.manifest.projectId,
     workspaceMode: previousForSameProject?.workspaceMode || "model",
     activePanel: previousForSameProject?.activePanel || "assembly",
-    reasoningPanel: previousForSameProject?.reasoningPanel || "summary",
+    reasoningPanel:
+      previousForSameProject?.reasoningPanel && previousForSameProject.reasoningPanel !== "agent"
+        ? previousForSameProject.reasoningPanel
+        : "summary",
     selectionMode: previousForSameProject?.selectionMode || "part",
     selection: defaultSelection,
     expandedNodeIds: previousForSameProject?.expandedNodeIds || new Set(topLevelAssemblies),
     treeSearch: previousForSameProject?.treeSearch || "",
     hiddenNodeIds: previousForSameProject?.hiddenNodeIds || new Set(),
     isolatedNodeIds: previousForSameProject?.isolatedNodeIds || null,
+    nodeOpacityMap: previousForSameProject?.nodeOpacityMap ? { ...previousForSameProject.nodeOpacityMap } : {},
+    nodeTranslationMap: previousForSameProject?.nodeTranslationMap ? { ...previousForSameProject.nodeTranslationMap } : {},
+    faceMapTargetPartIds: previousForSameProject?.faceMapTargetPartIds || [],
+    displayMode: previousForSameProject?.displayMode || "beauty",
     section: previousForSameProject?.section || {
       enabled: false,
       axis: "x",
@@ -493,6 +1090,696 @@ function getPartDisplayName(partId) {
   return state.activeProject.nodeMap.get(partId)?.name || partId;
 }
 
+function getFaceColorMapEntry(faceId) {
+  if (!faceId) {
+    return null;
+  }
+
+  const evidenceMap =
+    state.workbench?.reasoning?.data?.stepVisualEvidence?.faceColorMap ||
+    state.viewer?.getColorMap?.("face-mask") ||
+    [];
+  return evidenceMap.find((entry) => entry.faceId === faceId) || null;
+}
+
+function getAgentStatusLabel(status) {
+  return {
+    idle: "未运行",
+    running: "分析中",
+    ready: "已完成",
+    error: "失败",
+  }[status] || "未知";
+}
+
+function getDisplayModeLabel(displayMode) {
+  return displayMode === "face-map" ? "零件面映射" : "普通显示";
+}
+
+function getFaceMapTargetPartIds() {
+  if (!state.workbench) {
+    return [];
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  return resolveAgentTargetPartIds(agent.partQuery).partIds;
+}
+
+function haveSameItems(left = [], right = []) {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const leftSet = new Set(left);
+  return right.every((item) => leftSet.has(item));
+}
+
+function uniqueNonEmpty(values = []) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function getCurrentAgentTimelineStep() {
+  if (!state.workbench) {
+    return null;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  return agent.selectedTimelineIndex >= 0 ? agent.timeline?.[agent.selectedTimelineIndex] || null : null;
+}
+
+function getDefaultAgentTargetPartIds() {
+  if (!state.workbench) {
+    return [];
+  }
+
+  const reasoning = state.workbench.reasoning;
+  const currentAgentStep = getCurrentAgentTimelineStep();
+  const selectedNodePartIds = state.workbench.selection?.nodeId
+    ? getPartIdsForNode(state.workbench.selection.nodeId)
+    : [];
+
+  return uniqueNonEmpty([
+    ...(currentAgentStep?.focusPartIds || []),
+    currentAgentStep?.basePartId,
+    currentAgentStep?.assemblingPartId,
+    reasoning.selection.basePartId,
+    reasoning.selection.assemblingPartId,
+    ...selectedNodePartIds,
+  ]);
+}
+
+function parseAgentPartQuery(query) {
+  return String(query || "")
+    .split(/[\n,;，；]+/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function resolveAgentTargetPartIds(query = "") {
+  if (!state.activeProject) {
+    return { partIds: [], unresolvedTokens: [] };
+  }
+
+  const tokens = parseAgentPartQuery(query);
+  if (!tokens.length) {
+    return { partIds: getDefaultAgentTargetPartIds(), unresolvedTokens: [] };
+  }
+
+  const partNodes = state.activeProject.partNodes || [];
+  const exactNameMap = new Map();
+  partNodes.forEach((node) => {
+    const key = String(node.name || "").trim().toLowerCase();
+    if (!key) {
+      return;
+    }
+    if (!exactNameMap.has(key)) {
+      exactNameMap.set(key, []);
+    }
+    exactNameMap.get(key).push(node.id);
+  });
+
+  const resolved = [];
+  const unresolvedTokens = [];
+
+  tokens.forEach((token) => {
+    if (state.activeProject.nodeMap.get(token)?.kind === "part") {
+      resolved.push(token);
+      return;
+    }
+
+    const lowerToken = token.toLowerCase();
+    const exactMatches = exactNameMap.get(lowerToken) || [];
+    if (exactMatches.length === 1) {
+      resolved.push(exactMatches[0]);
+      return;
+    }
+
+    const fuzzyMatches = partNodes
+      .filter((node) => String(node.name || "").toLowerCase().includes(lowerToken))
+      .map((node) => node.id);
+    if (fuzzyMatches.length === 1) {
+      resolved.push(fuzzyMatches[0]);
+      return;
+    }
+
+    unresolvedTokens.push(token);
+  });
+
+  return {
+    partIds: uniqueNonEmpty(resolved),
+    unresolvedTokens,
+  };
+}
+
+function applyAgentPartIsolation() {
+  if (!state.workbench) {
+    return;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  const { partIds, unresolvedTokens } = resolveAgentTargetPartIds(agent.partQuery);
+
+  if (unresolvedTokens.length) {
+    pushToast(`未识别零件：${unresolvedTokens.join(" / ")}`, "warning");
+  }
+  if (!partIds.length) {
+    pushToast("没有可单独显示的零件，请输入零件 ID/名称或先选中流程节点。", "warning");
+    return;
+  }
+
+  state.workbench.isolatedNodeIds = new Set(partIds);
+  state.workbench.hiddenNodeIds = new Set();
+  state.workbench.reasoningPanel = "agent";
+  syncViewerState();
+  render();
+  pushToast(`已聚焦 ${partIds.length} 个零件。`, "success");
+}
+
+function clearAgentPartIsolation() {
+  if (!state.workbench) {
+    return;
+  }
+
+  state.workbench.isolatedNodeIds = null;
+  syncViewerState();
+  render();
+  pushToast("已恢复全部零件显示。", "info");
+}
+
+function hideAgentTargetParts() {
+  if (!state.workbench) {
+    return;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  const { partIds, unresolvedTokens } = resolveAgentTargetPartIds(agent.partQuery);
+
+  if (unresolvedTokens.length) {
+    pushToast(`未识别零件：${unresolvedTokens.join(" / ")}`, "warning");
+  }
+  if (!partIds.length) {
+    pushToast("没有可隐藏的零件，请输入零件 ID/名称或先选中流程节点。", "warning");
+    return;
+  }
+
+  const nextHidden = new Set(state.workbench.hiddenNodeIds || []);
+  partIds.forEach((partId) => nextHidden.add(partId));
+  state.workbench.hiddenNodeIds = nextHidden;
+  state.workbench.isolatedNodeIds = null;
+
+  if (state.workbench.selection && partIds.includes(state.workbench.selection.nodeId)) {
+    state.workbench.selection = null;
+  }
+
+  syncViewerState();
+  render();
+  pushToast(`已隐藏 ${partIds.length} 个零件。`, "success");
+}
+
+function resetDisplayVisibilityState() {
+  if (!state.workbench) {
+    return;
+  }
+
+  state.workbench.hiddenNodeIds = new Set();
+  state.workbench.isolatedNodeIds = null;
+  syncViewerState();
+  render();
+  pushToast("已恢复默认显示范围。", "info");
+}
+
+function applyAgentPartOpacity() {
+  if (!state.workbench) {
+    return;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  const { partIds, unresolvedTokens } = resolveAgentTargetPartIds(agent.partQuery);
+
+  if (unresolvedTokens.length) {
+    pushToast(`未识别零件：${unresolvedTokens.join(" / ")}`, "warning");
+  }
+  if (!partIds.length) {
+    pushToast("没有可调整透明度的零件，请输入零件 ID/名称或先选中流程节点。", "warning");
+    return;
+  }
+
+  const opacity = Math.max(0.05, Math.min(1, Number(agent.opacityValue) || 1));
+  const nextMap = { ...(state.workbench.nodeOpacityMap || {}) };
+  partIds.forEach((partId) => {
+    if (opacity >= 0.999) {
+      delete nextMap[partId];
+    } else {
+      nextMap[partId] = opacity;
+    }
+  });
+  state.workbench.nodeOpacityMap = nextMap;
+  syncViewerState();
+  render();
+  pushToast(
+    opacity >= 0.999
+      ? `已将 ${partIds.length} 个零件恢复为默认不透明度。`
+      : `已将 ${partIds.length} 个零件的不透明度设置为 ${Math.round(opacity * 100)}%。`,
+    "success",
+  );
+}
+
+function resetAgentPartOpacity() {
+  if (!state.workbench) {
+    return;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  const { partIds } = resolveAgentTargetPartIds(agent.partQuery);
+  if (!partIds.length) {
+    state.workbench.nodeOpacityMap = {};
+    syncViewerState();
+    render();
+    pushToast("已恢复所有零件的默认不透明度。", "info");
+    return;
+  }
+
+  const nextMap = { ...(state.workbench.nodeOpacityMap || {}) };
+  partIds.forEach((partId) => {
+    delete nextMap[partId];
+  });
+  state.workbench.nodeOpacityMap = nextMap;
+  syncViewerState();
+  render();
+  pushToast(`已恢复 ${partIds.length} 个零件的默认不透明度。`, "info");
+}
+
+function setWorkbenchDisplayMode(displayMode) {
+  if (!state.workbench) {
+    return;
+  }
+
+  const nextMode = displayMode === "face-map" ? "face-map" : "beauty";
+  state.workbench.displayMode = nextMode;
+  state.workbench.reasoning.data.agentAnalysis.faceMapEnabled = nextMode === "face-map";
+  state.workbench.faceMapTargetPartIds = nextMode === "face-map" ? getFaceMapTargetPartIds() : [];
+  syncViewerState();
+  render();
+}
+
+function enableAgentFaceMap() {
+  const targetPartIds = getFaceMapTargetPartIds();
+  if (!targetPartIds.length) {
+    pushToast("没有可做面映射的目标零件，请先输入零件或选中当前焦点。", "warning");
+    return;
+  }
+  setWorkbenchDisplayMode("face-map");
+  pushToast(`已显示 ${targetPartIds.length} 个目标零件的高饱和面映射。`, "success");
+}
+
+function disableAgentFaceMap() {
+  setWorkbenchDisplayMode("beauty");
+  pushToast("已恢复普通模型显示。", "info");
+}
+
+function toggleFaceMapDisplay() {
+  if (!state.workbench) {
+    return;
+  }
+
+  const nextTargetPartIds = getFaceMapTargetPartIds();
+  if (
+    state.workbench.displayMode === "face-map" &&
+    nextTargetPartIds.length &&
+    !haveSameItems(nextTargetPartIds, state.workbench.faceMapTargetPartIds || [])
+  ) {
+    state.workbench.faceMapTargetPartIds = nextTargetPartIds;
+    syncViewerState();
+    render();
+    pushToast(`已更新面映射目标，共 ${nextTargetPartIds.length} 个零件。`, "success");
+    return;
+  }
+
+  if (state.workbench.displayMode === "face-map") {
+    disableAgentFaceMap();
+    return;
+  }
+
+  enableAgentFaceMap();
+}
+
+function getAgentMoveVector() {
+  if (!state.workbench) {
+    return null;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  const x = Number(agent.moveDirectionX) || 0;
+  const y = Number(agent.moveDirectionY) || 0;
+  const z = Number(agent.moveDirectionZ) || 0;
+  const length = Math.sqrt(x ** 2 + y ** 2 + z ** 2);
+  if (!length) {
+    return null;
+  }
+
+  return {
+    x: x / length,
+    y: y / length,
+    z: z / length,
+  };
+}
+
+function applyAgentPartTranslation() {
+  if (!state.workbench) {
+    return;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  const { partIds, unresolvedTokens } = resolveAgentTargetPartIds(agent.partQuery);
+  const direction = getAgentMoveVector();
+  const distance = Number(agent.moveDistance) || 0;
+
+  if (unresolvedTokens.length) {
+    pushToast(`未识别零件：${unresolvedTokens.join(" / ")}`, "warning");
+  }
+  if (!partIds.length) {
+    pushToast("没有可移动的零件，请输入零件 ID/名称或先选中流程节点。", "warning");
+    return;
+  }
+  if (!direction) {
+    pushToast("移动方向不能为 0 / 0 / 0。", "warning");
+    return;
+  }
+  if (!Number.isFinite(distance) || !distance) {
+    pushToast("请输入有效的移动距离。", "warning");
+    return;
+  }
+
+  const delta = {
+    x: direction.x * distance,
+    y: direction.y * distance,
+    z: direction.z * distance,
+  };
+  const nextMap = { ...(state.workbench.nodeTranslationMap || {}) };
+  partIds.forEach((partId) => {
+    const current = nextMap[partId] || { x: 0, y: 0, z: 0 };
+    nextMap[partId] = {
+      x: (current.x || 0) + delta.x,
+      y: (current.y || 0) + delta.y,
+      z: (current.z || 0) + delta.z,
+    };
+  });
+
+  state.workbench.nodeTranslationMap = nextMap;
+  syncViewerState();
+  render();
+  pushToast(`已沿指定方向移动 ${partIds.length} 个零件 ${formatNumber(distance)} mm。`, "success");
+}
+
+function resetAgentPartTranslation() {
+  if (!state.workbench) {
+    return;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  const { partIds } = resolveAgentTargetPartIds(agent.partQuery);
+
+  if (!partIds.length) {
+    state.workbench.nodeTranslationMap = {};
+    syncViewerState();
+    render();
+    pushToast("已恢复所有零件的默认位置。", "info");
+    return;
+  }
+
+  const nextMap = { ...(state.workbench.nodeTranslationMap || {}) };
+  partIds.forEach((partId) => {
+    delete nextMap[partId];
+  });
+  state.workbench.nodeTranslationMap = nextMap;
+  syncViewerState();
+  render();
+  pushToast(`已恢复 ${partIds.length} 个零件的默认位置。`, "info");
+}
+
+function normalizeAgentInsertionAxis(axis) {
+  if (!axis || typeof axis !== "object") {
+    return null;
+  }
+
+  const origin = axis.origin && typeof axis.origin === "object"
+    ? {
+        x: Number.isFinite(Number(axis.origin.x)) ? Number(axis.origin.x) : 0,
+        y: Number.isFinite(Number(axis.origin.y)) ? Number(axis.origin.y) : 0,
+        z: Number.isFinite(Number(axis.origin.z)) ? Number(axis.origin.z) : 0,
+      }
+    : null;
+
+  const direction = axis.direction && typeof axis.direction === "object"
+    ? {
+        x: Number.isFinite(Number(axis.direction.x)) ? Number(axis.direction.x) : 0,
+        y: Number.isFinite(Number(axis.direction.y)) ? Number(axis.direction.y) : 0,
+        z: Number.isFinite(Number(axis.direction.z)) ? Number(axis.direction.z) : 1,
+      }
+    : { x: 0, y: 0, z: 1 };
+
+  const length = Number.isFinite(Number(axis.length)) ? Math.max(8, Number(axis.length)) : 16;
+  return {
+    origin,
+    direction,
+    length,
+  };
+}
+
+function normalizeAgentFocus(focus = {}) {
+  const focusPartIds = Array.from(
+    new Set([
+      ...(Array.isArray(focus.focusPartIds) ? focus.focusPartIds : []),
+      focus.basePartId,
+      focus.assemblingPartId,
+    ].filter(Boolean)),
+  );
+
+  return {
+    basePartId: focus.basePartId || focusPartIds[0] || null,
+    assemblingPartId: focus.assemblingPartId || focusPartIds[1] || null,
+    focusPartIds,
+    baseFaceIds: Array.from(new Set((Array.isArray(focus.baseFaceIds) ? focus.baseFaceIds : []).filter(Boolean))),
+    assemblingFaceIds: Array.from(
+      new Set((Array.isArray(focus.assemblingFaceIds) ? focus.assemblingFaceIds : []).filter(Boolean)),
+    ),
+    focusFaceIds: Array.from(new Set((Array.isArray(focus.focusFaceIds) ? focus.focusFaceIds : []).filter(Boolean))),
+    insertionAxis: normalizeAgentInsertionAxis(focus.insertionAxis),
+  };
+}
+
+function buildOverlayFromAgentFocus(focus = {}) {
+  const normalized = normalizeAgentFocus(focus);
+  const inferredBaseFaces = normalized.baseFaceIds.length
+    ? normalized.baseFaceIds
+    : normalized.focusFaceIds.slice(0, 1);
+  const inferredAssemblingFaces = normalized.assemblingFaceIds.length
+    ? normalized.assemblingFaceIds
+    : normalized.focusFaceIds.slice(1, 2);
+
+  return {
+    ...createEmptyReasoningOverlay(),
+    focusPartIds: normalized.focusPartIds,
+    basePartId: normalized.basePartId,
+    assemblingPartId: normalized.assemblingPartId,
+    baseFaceIds: inferredBaseFaces,
+    assemblingFaceIds: inferredAssemblingFaces,
+    insertionAxis: normalized.insertionAxis,
+    interferenceBoxes: [],
+  };
+}
+
+function applyAgentTimelineFocus(index, options = {}) {
+  if (!state.workbench) {
+    return;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  const timeline = Array.isArray(agent.timeline) ? agent.timeline : [];
+  if (!timeline.length) {
+    return;
+  }
+
+  const nextIndex = Math.max(0, Math.min(timeline.length - 1, Number(index) || 0));
+  agent.selectedTimelineIndex = nextIndex;
+  if (!options.silent) {
+    render();
+  }
+}
+
+function inferAgentCandidateId(reasoning) {
+  const basePartId = reasoning.selection.basePartId;
+  const assemblingPartId = reasoning.selection.assemblingPartId;
+  if (!basePartId || !assemblingPartId) {
+    return null;
+  }
+
+  const match = (reasoning.data.matingCandidates || []).find((item) => {
+    const forward = item.partAId === basePartId && item.partBId === assemblingPartId;
+    const reverse = item.partAId === assemblingPartId && item.partBId === basePartId;
+    return forward || reverse;
+  });
+  return match?.pairId ? `relation:${match.pairId}` : null;
+}
+
+function buildVlmAgentRequestPayload() {
+  const reasoning = state.workbench.reasoning;
+  const selection = reasoning.selection;
+  const agent = reasoning.data.agentAnalysis;
+  const focusPartIds = Array.from(
+    new Set([
+      selection.basePartId,
+      selection.assemblingPartId,
+      ...(reasoning.overlay?.focusPartIds || []),
+    ].filter(Boolean)),
+  );
+  const focusFaceIds = Array.from(
+    new Set([
+      ...(reasoning.overlay?.baseFaceIds || []),
+      ...(reasoning.overlay?.assemblingFaceIds || []),
+      selection.highlightedBaseFaceId,
+      selection.highlightedAssemblingFaceId,
+    ].filter(Boolean)),
+  );
+  const stepVisual = reasoning.data.stepVisualEvidence;
+
+  return {
+    projectId: state.activeProject.manifest.projectId,
+    instruction: agent.instruction || "",
+    conversationHistory: agent.chatMessages || [],
+    candidateId: inferAgentCandidateId(reasoning),
+    focusPartIds,
+    focusFaceIds,
+    baseFaceIds: reasoning.overlay?.baseFaceIds || [],
+    assemblingFaceIds: reasoning.overlay?.assemblingFaceIds || [],
+    selection: {
+      basePartId: selection.basePartId,
+      assemblingPartId: selection.assemblingPartId,
+      sequenceId: selection.sequenceId,
+      stepIndex: selection.stepIndex,
+      highlightedBaseFaceId: selection.highlightedBaseFaceId,
+      highlightedAssemblingFaceId: selection.highlightedAssemblingFaceId,
+    },
+    localVisualEvidence: stepVisual
+      ? {
+          overlayDataUrl: stepVisual.overlayDataUrl || null,
+          faceMaskDataUrl: stepVisual.faceMaskDataUrl || null,
+        }
+      : null,
+    stepPreviewDataUrl: reasoning.data.stepPreview?.dataUrl || null,
+    reasoningSnapshot: {
+      summary: reasoning.data.summary || null,
+      selectedPair: reasoning.data.selectedPair || null,
+      relativeTransform: reasoning.data.relativeTransform || null,
+      interference: reasoning.data.interference || null,
+      plan: reasoning.data.plan || null,
+      stepExplanation: reasoning.data.stepExplanation || null,
+    },
+  };
+}
+
+function appendAgentChatMessage(role, content) {
+  if (!state.workbench) {
+    return;
+  }
+
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  agent.chatMessages = [
+    ...(Array.isArray(agent.chatMessages) ? agent.chatMessages : []),
+    {
+      id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+      role: role === "assistant" ? "assistant" : "user",
+      content: String(content || "").trim(),
+      timestamp: new Date().toISOString(),
+    },
+  ].filter((item) => item.content).slice(-20);
+}
+
+async function runVlmAgentAnalysis(options = {}) {
+  if (!state.workbench || !state.activeProject) {
+    return;
+  }
+
+  const reasoning = state.workbench.reasoning;
+  const agent = reasoning.data.agentAnalysis;
+  state.workbench.workspaceMode = "model";
+  state.workbench.activePanel = "agent";
+  const userInstruction = String(options.instruction || agent.chatInput || agent.instruction || "").trim();
+
+  if (options.fromChat) {
+    if (!userInstruction) {
+      pushToast("请先输入任务指令。", "warning");
+      render({ preserveBoundInput: true });
+      return;
+    }
+    agent.instruction = userInstruction;
+    appendAgentChatMessage("user", userInstruction);
+    agent.chatInput = "";
+  } else if (userInstruction) {
+    agent.instruction = userInstruction;
+  }
+
+  if (reasoning.status === "idle") {
+    await refreshReasoningData();
+  } else if (!reasoning.data.stepExplanation && reasoning.selection.sequenceId) {
+    await loadReasoningStep({ silent: true });
+  } else if (!reasoning.data.stepVisualEvidence && reasoning.data.stepExplanation) {
+    await captureReasoningVisualEvidence({ silent: true });
+  }
+
+  agent.status = "running";
+  agent.error = "";
+  agent.startedAt = new Date().toISOString();
+  agent.finishedAt = "";
+  agent.summary = "";
+  agent.timeline = [];
+  agent.toolStages = [];
+  agent.processLog = [];
+  agent.selectedTimelineIndex = -1;
+  render({ preserveBoundInput: true });
+
+  try {
+    const payload = buildVlmAgentRequestPayload();
+    const result = await api.runVlmAgentAnalysis(payload);
+    const timeline = (Array.isArray(result?.timeline) ? result.timeline : []).map((item) => {
+      const normalizedItem = item && typeof item === "object" ? item : {};
+      return {
+        ...normalizeAgentFocus(normalizedItem),
+        stageId: normalizedItem.stageId || "",
+        title: normalizedItem.title || "分析阶段",
+        detail: normalizedItem.detail || "",
+      };
+    });
+
+    agent.status = "ready";
+    agent.error = "";
+    agent.finishedAt = new Date().toISOString();
+    agent.model = result?.model || "";
+    agent.endpoint = result?.endpoint || "";
+    agent.instruction = result?.instruction || agent.instruction;
+    agent.summary = result?.summary || "";
+    agent.confidence = Number.isFinite(Number(result?.confidence)) ? Number(result.confidence) : 0;
+    agent.timeline = timeline;
+    agent.selectedTimelineIndex = timeline.length ? 0 : -1;
+    agent.suggestions = Array.isArray(result?.suggestions) ? result.suggestions : [];
+    agent.usage = result?.usage || null;
+    agent.evidence = result?.evidence || null;
+    agent.contextStats = result?.contextStats || null;
+    agent.processLog = Array.isArray(result?.processLog) ? result.processLog : [];
+    agent.toolStages = Array.isArray(result?.toolStages) ? result.toolStages : [];
+    agent.raw = result?.raw || null;
+    appendAgentChatMessage("assistant", result?.summary || "任务已完成。");
+
+    pushToast("VLM 分析完成，左侧流程与右侧模型已联动。", "success");
+  } catch (error) {
+    agent.status = "error";
+    agent.error = error?.message || String(error);
+    agent.finishedAt = new Date().toISOString();
+    appendAgentChatMessage("assistant", `执行失败：${agent.error}`);
+    pushToast(`VLM 分析失败：${agent.error}`, "error");
+  }
+
+  render({ preserveBoundInput: true });
+}
+
 function applyReasoningOverlay(overlay) {
   if (!state.workbench) {
     return;
@@ -524,6 +1811,50 @@ function applyReasoningMatingFaceHighlight(baseFaceId, assemblingFaceId) {
   };
   applyReasoningOverlay(overlay);
 }
+
+async function captureReasoningVisualEvidence(options = {}) {
+  if (!state.workbench || !state.activeProject || !state.viewer) {
+    return null;
+  }
+
+  const reasoning = state.workbench.reasoning;
+  const explanation = reasoning.data.stepExplanation;
+  if (!explanation) {
+    return null;
+  }
+
+  const baseFaceIds = reasoning.selection.highlightedBaseFaceId
+    ? [reasoning.selection.highlightedBaseFaceId]
+    : explanation.matingFaces?.map((item) => item.baseFaceId).filter(Boolean) || [];
+  const assemblingFaceIds = reasoning.selection.highlightedAssemblingFaceId
+    ? [reasoning.selection.highlightedAssemblingFaceId]
+    : explanation.matingFaces?.map((item) => item.partFaceId).filter(Boolean) || [];
+
+  try {
+    const evidence = await state.viewer.captureCandidateOverlay(
+      {
+        ...(reasoning.data.stepOverlay || createEmptyReasoningOverlay()),
+        baseFaceIds,
+        assemblingFaceIds,
+      },
+      {
+        width: options.width || 540,
+        height: options.height || 320,
+        fit: options.fit !== false,
+      },
+    );
+    reasoning.data.stepVisualEvidence = evidence;
+    reasoning.data.stepVisualEvidenceError = "";
+    return evidence;
+  } catch (error) {
+    reasoning.data.stepVisualEvidence = null;
+    reasoning.data.stepVisualEvidenceError = error?.message || String(error);
+    if (!options.silent) {
+      render();
+    }
+    return null;
+  }
+}
 async function refreshReasoningData() {
   if (!state.activeProject || !state.workbench) {
     return;
@@ -533,6 +1864,11 @@ async function refreshReasoningData() {
   const projectId = state.activeProject.manifest.projectId;
   reasoning.status = "loading";
   reasoning.error = "";
+  reasoning.data.stepExplanation = null;
+  reasoning.data.stepPreview = null;
+  reasoning.data.stepPreviewError = "";
+  reasoning.data.stepVisualEvidence = null;
+  reasoning.data.stepVisualEvidenceError = "";
   render();
 
   try {
@@ -698,6 +2034,11 @@ async function loadReasoningStep(options = {}) {
 
   const reasoning = state.workbench.reasoning;
   if (!reasoning.selection.sequenceId) {
+    reasoning.data.stepExplanation = null;
+    reasoning.data.stepPreview = null;
+    reasoning.data.stepPreviewError = "";
+    reasoning.data.stepVisualEvidence = null;
+    reasoning.data.stepVisualEvidenceError = "";
     return null;
   }
 
@@ -718,6 +2059,8 @@ async function loadReasoningStep(options = {}) {
 
     reasoning.data.stepPreview = null;
     reasoning.data.stepPreviewError = "";
+    reasoning.data.stepVisualEvidence = null;
+    reasoning.data.stepVisualEvidenceError = "";
     if (state.viewer && options.capturePreview !== false) {
       try {
         reasoning.data.stepPreview = await api.captureReasoningStepPreview({
@@ -729,6 +2072,10 @@ async function loadReasoningStep(options = {}) {
       } catch (previewError) {
         reasoning.data.stepPreviewError = previewError?.message || String(previewError);
       }
+    }
+
+    if (state.viewer) {
+      await captureReasoningVisualEvidence({ silent: true });
     }
 
     if (!options.silent) {
@@ -795,8 +2142,40 @@ function restoreBoundInputState(snapshot) {
   }
 }
 
+function captureScrollState() {
+  return {
+    windowX: window.scrollX || 0,
+    windowY: window.scrollY || 0,
+    elements: Array.from(root.querySelectorAll("[data-preserve-scroll]")).map((element) => ({
+      key: element.dataset.preserveScroll,
+      scrollTop: element.scrollTop,
+      scrollLeft: element.scrollLeft,
+    })),
+  };
+}
+
+function restoreScrollState(snapshot) {
+  if (!snapshot) {
+    return;
+  }
+
+  window.scrollTo(snapshot.windowX || 0, snapshot.windowY || 0);
+  snapshot.elements.forEach((item) => {
+    if (!item?.key) {
+      return;
+    }
+    const element = root.querySelector(`[data-preserve-scroll="${item.key}"]`);
+    if (!element) {
+      return;
+    }
+    element.scrollTop = item.scrollTop || 0;
+    element.scrollLeft = item.scrollLeft || 0;
+  });
+}
+
 function render(options = {}) {
   const boundInputState = options.preserveBoundInput ? captureBoundInputState() : null;
+  const scrollState = captureScrollState();
   const viewerSnapshot = state.route.page === "workbench" ? state.viewer?.snapshot() || null : null;
   document.body.classList.toggle("workbench-mode", state.route.page === "workbench");
   root.innerHTML = `${state.route.page === "workbench" ? renderWorkbenchPage() : renderHomePageWireframe()}${renderToasts()}`;
@@ -809,6 +2188,8 @@ function render(options = {}) {
   if (boundInputState) {
     restoreBoundInputState(boundInputState);
   }
+
+  restoreScrollState(scrollState);
 
   toggleDragMask(state.globalDragging);
   publishMcpState();
@@ -1028,14 +2409,33 @@ function renderWorkbenchPage() {
   const { manifest } = state.activeProject;
   const reasoning = state.workbench.reasoning;
   const isReasoningMode = state.workbench.workspaceMode === "reasoning";
+  const isAgentPanelActive = !isReasoningMode && state.workbench.activePanel === "agent";
+  const usesReasoningViewerContext = isReasoningMode;
   const selectedLabel = getSelectionLabel();
   const visiblePartCount = getVisiblePartCount();
   const hiddenPartCount = state.activeProject.partNodes.length - visiblePartCount;
   const activePanelMeta = getActivePanelMeta();
   const navigation = isReasoningMode ? REASONING_PANEL_META : PANEL_META;
   const currentStep = reasoning.data.stepExplanation;
-  const focusBaseName = getPartDisplayName(reasoning.selection.basePartId);
-  const focusAssemblingName = getPartDisplayName(reasoning.selection.assemblingPartId);
+  const agentAnalysis = reasoning.data.agentAnalysis;
+  const currentAgentTimelineStep =
+    isAgentPanelActive && agentAnalysis.selectedTimelineIndex >= 0
+      ? agentAnalysis.timeline?.[agentAnalysis.selectedTimelineIndex] || null
+      : null;
+  const focusBaseName = getPartDisplayName(currentAgentTimelineStep?.basePartId || reasoning.selection.basePartId);
+  const focusAssemblingName = getPartDisplayName(
+    currentAgentTimelineStep?.assemblingPartId || reasoning.selection.assemblingPartId,
+  );
+  const reasoningStepLabel =
+    isAgentPanelActive
+      ? currentAgentTimelineStep
+        ? currentAgentTimelineStep.title || `流程阶段 ${agentAnalysis.selectedTimelineIndex + 1}`
+        : agentAnalysis.status === "running"
+          ? "VLM 分析中..."
+          : "还未选择流程阶段"
+      : currentStep
+        ? `${currentStep.sequenceId} / Step ${currentStep.stepIndex}`
+        : "选择候选或步骤后联动 viewer";
 
   return `
     <main class="workbench-shell">
@@ -1068,7 +2468,7 @@ function renderWorkbenchPage() {
       </header>
 
       <section class="workbench-body ${isReasoningMode ? "is-reasoning" : ""}">
-        <nav class="nav-rail">
+        <nav class="nav-rail" data-preserve-scroll="workbench-nav">
           ${Object.entries(navigation)
             .map(([key, panel]) => {
               const isActive = isReasoningMode ? key === state.workbench.reasoningPanel : key === state.workbench.activePanel;
@@ -1091,7 +2491,7 @@ function renderWorkbenchPage() {
             <h3>${activePanelMeta?.title || "工作台"}</h3>
             <p>${activePanelMeta?.description || ""}</p>
           </div>
-          <div class="side-panel-scroll">
+          <div class="side-panel-scroll" data-preserve-scroll="workbench-side-panel">
             ${renderWorkbenchPanel()}
           </div>
         </aside>
@@ -1102,21 +2502,21 @@ function renderWorkbenchPage() {
           <div class="viewer-overlay-top">
             <div class="viewer-chip"><strong>工作区</strong><span>${isReasoningMode ? "装配推理" : "模型工作台"}</span></div>
             <div class="viewer-chip"><strong>选择模式</strong><span>${state.workbench.selectionMode === "face" ? "面级" : "零件级"}</span></div>
-            <div class="viewer-chip"><strong>${isReasoningMode ? "推理状态" : "当前剖切"}</strong><span>${isReasoningMode ? getReasoningStatusLabel(reasoning.status) : state.workbench.section.enabled ? `${state.workbench.section.axis.toUpperCase()} = ${Math.round(state.workbench.section.offset)}` : "关闭"}</span></div>
+            <div class="viewer-chip"><strong>${usesReasoningViewerContext ? "推理状态" : "当前剖切"}</strong><span>${usesReasoningViewerContext ? getReasoningStatusLabel(reasoning.status) : state.workbench.section.enabled ? `${state.workbench.section.axis.toUpperCase()} = ${Math.round(state.workbench.section.offset)}` : "关闭"}</span></div>
           </div>
-          <div class="viewer-floating ${isReasoningMode ? "is-visible" : ""}">
+          <div class="viewer-floating ${usesReasoningViewerContext ? "is-visible" : ""}">
             <div class="floating-card">
-              <h4>${isReasoningMode ? "推理焦点" : "当前选中"}</h4>
-              <p>${isReasoningMode ? `${escapeHtml(focusBaseName)} -> ${escapeHtml(focusAssemblingName)}` : escapeHtml(selectedLabel)}</p>
+              <h4>${usesReasoningViewerContext ? "推理焦点" : "当前选中"}</h4>
+              <p>${usesReasoningViewerContext ? `${escapeHtml(focusBaseName)} -> ${escapeHtml(focusAssemblingName)}` : escapeHtml(selectedLabel)}</p>
             </div>
             <div class="floating-card">
-              <h4>${isReasoningMode ? "当前步骤" : "显示摘要"}</h4>
-              <p>${isReasoningMode ? currentStep ? `${escapeHtml(currentStep.sequenceId)} / Step ${currentStep.stepIndex}` : "选择候选或步骤后联动 viewer" : `可见零件 ${visiblePartCount} / ${state.activeProject.partNodes.length}，隐藏 ${hiddenPartCount}`}</p>
+              <h4>${usesReasoningViewerContext ? "当前步骤" : "显示摘要"}</h4>
+              <p>${usesReasoningViewerContext ? escapeHtml(reasoningStepLabel) : `可见零件 ${visiblePartCount} / ${state.activeProject.partNodes.length}，隐藏 ${hiddenPartCount}`}</p>
             </div>
           </div>
           <div class="viewer-overlay-bottom">
             <div class="viewer-chip"><strong>操作提示</strong><span data-role="viewer-hint">${escapeHtml(state.workbench.viewerHint)}</span></div>
-            <div class="viewer-chip"><strong>${isReasoningMode ? "当前聚焦" : "对象状态"}</strong><span>${isReasoningMode ? `${escapeHtml(focusBaseName)} / ${escapeHtml(focusAssemblingName)}` : state.workbench.isolatedNodeIds ? "隔离中" : "显示全部 / 自定义显隐"}</span></div>
+            <div class="viewer-chip"><strong>${usesReasoningViewerContext ? "当前聚焦" : "对象状态"}</strong><span>${usesReasoningViewerContext ? `${escapeHtml(focusBaseName)} / ${escapeHtml(focusAssemblingName)}` : state.workbench.isolatedNodeIds ? "隔离中" : "显示全部 / 自定义显隐"}</span></div>
           </div>
         </section>
       </section>
@@ -1127,7 +2527,7 @@ function renderWorkbenchPage() {
           <span>工作区：<strong>${isReasoningMode ? "装配推理" : "模型工作台"}</strong></span>
           <span>选中对象：<strong>${escapeHtml(selectedLabel)}</strong></span>
           <span>零件 / 面数：<strong>${manifest.partCount} / ${manifest.faceCount}</strong></span>
-          ${isReasoningMode ? `<span>当前步骤：<strong>${currentStep ? `${escapeHtml(currentStep.sequenceId)} / Step ${currentStep.stepIndex}` : "未选中"}</strong></span>` : ""}
+          ${usesReasoningViewerContext ? `<span>当前步骤：<strong>${escapeHtml(reasoningStepLabel)}</strong></span>` : ""}
         </div>
         <span data-role="status-hint">${escapeHtml(state.workbench.viewerHint)}</span>
       </footer>
@@ -1167,6 +2567,8 @@ function renderWorkbenchPanel() {
       return renderAssemblyPanel();
     case "display":
       return renderDisplayPanel();
+    case "agent":
+      return renderReasoningAgentPanel();
     case "section":
       return renderSectionPanel();
     case "measure":
@@ -1182,6 +2584,8 @@ function renderReasoningPanel() {
   switch (state.workbench.reasoningPanel) {
     case "summary":
       return renderReasoningSummaryPanel();
+    case "agent":
+      return renderReasoningAgentPanel();
     case "constraints":
       return renderReasoningConstraintsPanel();
     case "transform":
@@ -1207,6 +2611,163 @@ function renderReasoningStatusNotice() {
     return `<div class="inline-note reasoning-note">最近更新：${formatDateTime(reasoning.refreshedAt)}</div>`;
   }
   return `<div class="inline-note reasoning-note">还没有运行过推理分析。</div>`;
+}
+
+function renderReasoningAgentPanel() {
+  const reasoning = state.workbench.reasoning;
+  const agent = reasoning.data.agentAnalysis;
+  const selectedStep =
+    agent.selectedTimelineIndex >= 0 ? agent.timeline?.[agent.selectedTimelineIndex] || null : null;
+  const isRunning = agent.status === "running";
+  const processLog = Array.isArray(agent.processLog) ? agent.processLog : [];
+  const toolStages = Array.isArray(agent.toolStages) ? agent.toolStages : [];
+  const chatMessages = Array.isArray(agent.chatMessages) ? agent.chatMessages : [];
+
+  return `
+    <div class="panel-card">
+      <div class="panel-actions">
+        <h4>任务对话</h4>
+        <button class="secondary-button" data-action="send-agent-chat" ${isRunning ? "disabled" : ""}>
+          ${isRunning ? "执行中..." : "发送指令"}
+        </button>
+      </div>
+      <p>在这里直接输入你的任务指令，模型会根据指令调用显示控制和截图工具完成任务。</p>
+      <div class="agent-chat-list" style="margin-top: 12px;">
+        ${
+          chatMessages.length
+            ? chatMessages
+                .map(
+                  (item) => `
+                    <div class="agent-chat-item ${item.role === "assistant" ? "is-assistant" : "is-user"}">
+                      <strong>${item.role === "assistant" ? "模型" : "你"}</strong>
+                      <span>${escapeHtml(item.content)}</span>
+                    </div>
+                  `,
+                )
+                .join("")
+            : `<div class="inline-note">还没有对话记录。输入一条任务指令后，模型会开始执行。</div>`
+        }
+      </div>
+      <textarea
+        class="agent-chat-input"
+        rows="4"
+        placeholder="例如：请使用显示控制和截图工具分析这个装配体，找出最可能的基准件，并说明为什么。"
+        data-bind="agent-chat-input"
+      >${escapeHtml(agent.chatInput || "")}</textarea>
+      <div class="overview-grid agent-meta-grid" style="margin-top: 12px;">
+        <div class="overview-row"><span>运行状态</span><strong>${getAgentStatusLabel(agent.status)}</strong></div>
+        <div class="overview-row"><span>模型</span><strong>${escapeHtml(agent.model || "-")}</strong></div>
+        <div class="overview-row"><span>置信度</span><strong>${formatConfidence(agent.confidence || 0)}</strong></div>
+        <div class="overview-row"><span>完成时间</span><strong>${escapeHtml(formatDateTime(agent.finishedAt) || "-")}</strong></div>
+        <div class="overview-row"><span>显示模式</span><strong>${escapeHtml(getDisplayModeLabel(state.workbench.displayMode))}</strong></div>
+      </div>
+      ${
+        agent.status === "error"
+          ? `<div class="inline-note reasoning-note is-error" style="margin-top: 10px;">${escapeHtml(agent.error || "VLM 调用失败")}</div>`
+          : ""
+      }
+      ${
+        agent.summary
+          ? `<div class="inline-note reasoning-note" style="margin-top: 10px;">${escapeHtml(agent.summary)}</div>`
+          : `<div class="inline-note reasoning-note" style="margin-top: 10px;">发送任务后，这里会显示模型的阶段性结论。</div>`
+      }
+      <div class="inline-note reasoning-note" style="margin-top: 10px;">
+        智能体会结合“显示控制”里的工具以及多视角截图工具，逐步分析装配体。
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>工具调用过程</h4>
+      <div class="reasoning-list">
+        ${
+          processLog.length
+            ? processLog
+                .map(
+                  (item, index) => `
+                    <div class="reasoning-item is-static">
+                      <strong>${index + 1}. ${escapeHtml(item.title || item.type || "过程事件")}</strong>
+                      <span>${escapeHtml(item.detail || "-")}</span>
+                      ${item.images?.length ? `<span>截图：${escapeHtml(item.images.join(" / "))}</span>` : ""}
+                    </div>
+                  `,
+                )
+                .join("")
+            : `<div class="inline-note">运行后会在这里显示智能体调用显示控制工具的全过程。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>工具阶段</h4>
+      <div class="reasoning-list">
+        ${
+          toolStages.length
+            ? toolStages
+                .map(
+                  (item, index) => `
+                    <div class="reasoning-item is-static">
+                      <strong>${index + 1}. ${escapeHtml(item.title || `阶段 ${index + 1}`)} / ${escapeHtml(item.toolName || "-")}</strong>
+                      <span>${escapeHtml(item.goal || item.detail || "-")}</span>
+                      ${item.observationLabels?.length ? `<span>观察：${escapeHtml(item.observationLabels.join(" / "))}</span>` : ""}
+                    </div>
+                  `,
+                )
+                .join("")
+            : `<div class="inline-note">运行后会在这里显示每个阶段使用的工具与目的。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>分析时间线</h4>
+      <div class="reasoning-list agent-timeline">
+        ${
+          agent.timeline?.length
+            ? agent.timeline
+                .map((item, index) => {
+                  const isActive = index === agent.selectedTimelineIndex;
+                  const partNames = item.focusPartIds?.length
+                    ? item.focusPartIds.map((partId) => getPartDisplayName(partId)).join(" / ")
+                    : "-";
+                  return `
+                    <button class="reasoning-item agent-step ${isActive ? "is-active" : ""}" data-action="select-agent-step" data-agent-step-index="${index}">
+                      <strong>${index + 1}. ${escapeHtml(item.title || "分析阶段")}</strong>
+                      <span>${escapeHtml(item.detail || "无详细说明。")}</span>
+                      <span class="agent-step-meta">焦点零件：${escapeHtml(partNames)}</span>
+                    </button>
+                  `;
+                })
+                .join("")
+            : `<div class="inline-note">运行后会在这里展示智能体的分析步骤。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>联动摘要</h4>
+      <div class="overview-grid">
+        <div class="overview-row"><span>当前流程节点</span><strong>${selectedStep ? escapeHtml(selectedStep.title || `阶段 ${agent.selectedTimelineIndex + 1}`) : "未选择"}</strong></div>
+        <div class="overview-row"><span>当前基准件</span><strong>${escapeHtml(getPartDisplayName(selectedStep?.basePartId || reasoning.selection.basePartId))}</strong></div>
+        <div class="overview-row"><span>当前装配件</span><strong>${escapeHtml(getPartDisplayName(selectedStep?.assemblingPartId || reasoning.selection.assemblingPartId))}</strong></div>
+        <div class="overview-row"><span>证据图数量</span><strong>${agent.evidence?.imageCount ?? 0}</strong></div>
+      </div>
+      ${
+        agent.evidence?.captureWarning
+          ? `<div class="inline-note reasoning-note" style="margin-top: 10px;">证据抓取提示：${escapeHtml(agent.evidence.captureWarning)}</div>`
+          : ""
+      }
+      ${
+        agent.suggestions?.length
+          ? `<div class="reasoning-list" style="margin-top: 12px;">${agent.suggestions
+              .map(
+                (item) => `
+                  <div class="reasoning-item is-static">
+                    <strong>建议</strong>
+                    <span>${escapeHtml(item)}</span>
+                  </div>
+                `,
+              )
+              .join("")}</div>`
+          : ""
+      }
+    </div>
+  `;
 }
 
 function renderReasoningSummaryPanel() {
@@ -1238,6 +2799,7 @@ function renderReasoningSummaryPanel() {
     <div class="panel-card">
       <h4>操作建议</h4>
       <div class="control-grid">
+        <button class="secondary-button" data-action="open-model-agent-panel">智能体流程面板</button>
         <button class="secondary-button" data-action="set-reasoning-panel" data-panel="constraints">查看约束发现</button>
         <button class="secondary-button" data-action="set-reasoning-panel" data-panel="plan">查看装配计划</button>
         <button class="secondary-button" data-action="set-reasoning-panel" data-panel="steps">查看步骤讲解</button>
@@ -1439,6 +3001,9 @@ function renderReasoningStepPanel() {
   const reasoning = state.workbench.reasoning;
   const explanation = reasoning.data.stepExplanation;
   const preview = reasoning.data.stepPreview;
+  const visualEvidence = reasoning.data.stepVisualEvidence;
+  const baseFaceEntry = getFaceColorMapEntry(reasoning.selection.highlightedBaseFaceId);
+  const assemblingFaceEntry = getFaceColorMapEntry(reasoning.selection.highlightedAssemblingFaceId);
 
   if (!explanation) {
     return `
@@ -1496,6 +3061,47 @@ function renderReasoningStepPanel() {
           explanation.evidence?.length
             ? explanation.evidence.map((item) => `<div class="reasoning-item is-static"><strong>Evidence</strong><span>${escapeHtml(item)}</span></div>`).join("")
             : `<div class="inline-note">暂无额外证据。</div>`
+        }
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>视觉证据</h4>
+      ${
+        visualEvidence
+          ? `
+            <div class="evidence-visual-grid">
+              <div class="evidence-visual-item">
+                <strong>Candidate Overlay</strong>
+                <img class="reasoning-preview reasoning-preview-compact" alt="Candidate Overlay" src="${visualEvidence.overlayDataUrl}" />
+              </div>
+              <div class="evidence-visual-item">
+                <strong>Face Mask</strong>
+                <img class="reasoning-preview reasoning-preview-compact" alt="Face Mask" src="${visualEvidence.faceMaskDataUrl}" />
+              </div>
+            </div>
+          `
+          : `<div class="inline-note">${escapeHtml(reasoning.data.stepVisualEvidenceError || "当前还没有生成视觉证据。")}</div>`
+      }
+      <div class="reasoning-list evidence-face-list" style="margin-top: 12px;">
+        ${
+          baseFaceEntry
+            ? `
+              <div class="reasoning-item is-static">
+                <strong>基准面</strong>
+                <span class="evidence-color-row"><span class="evidence-color-chip" style="background:${baseFaceEntry.colorHex}"></span>${escapeHtml(baseFaceEntry.faceName || baseFaceEntry.faceId)} / ${escapeHtml(baseFaceEntry.colorHex)}</span>
+              </div>
+            `
+            : ""
+        }
+        ${
+          assemblingFaceEntry
+            ? `
+              <div class="reasoning-item is-static">
+                <strong>装配面</strong>
+                <span class="evidence-color-row"><span class="evidence-color-chip" style="background:${assemblingFaceEntry.colorHex}"></span>${escapeHtml(assemblingFaceEntry.faceName || assemblingFaceEntry.faceId)} / ${escapeHtml(assemblingFaceEntry.colorHex)}</span>
+              </div>
+            `
+            : ""
         }
       </div>
     </div>
@@ -1610,30 +3216,108 @@ function renderTreeNode(nodeId) {
   `;
 }
 function renderDisplayPanel() {
-  const selection = state.workbench.selection;
-  const selectedLabel = selection ? getSelectionLabel() : "尚未选中对象";
+  const agent = state.workbench.reasoning.data.agentAnalysis;
+  const previewTargetPartIds = resolveAgentTargetPartIds(agent.partQuery).partIds;
+  const previewTargetPartNames = previewTargetPartIds.length
+    ? previewTargetPartIds.map((partId) => getPartDisplayName(partId)).join(" / ")
+    : "当前流程焦点 / 当前选中对象";
+  const moveVector = `${formatNumber(agent.moveDirectionX)} / ${formatNumber(agent.moveDirectionY)} / ${formatNumber(agent.moveDirectionZ)}`;
+  const faceMapTargetNames = state.workbench.faceMapTargetPartIds?.length
+    ? state.workbench.faceMapTargetPartIds.map((partId) => getPartDisplayName(partId)).join(" / ")
+    : previewTargetPartNames;
+  const canUpdateFaceMapTarget =
+    state.workbench.displayMode === "face-map" &&
+    previewTargetPartIds.length &&
+    !haveSameItems(previewTargetPartIds, state.workbench.faceMapTargetPartIds || []);
+
   return `
     <div class="panel-card">
-      <h4>当前可见状态</h4>
+      <h4>显示状态</h4>
       <div class="overview-grid">
         <div class="overview-row"><span>可见零件</span><strong>${getVisiblePartCount()}</strong></div>
         <div class="overview-row"><span>隐藏零件</span><strong>${state.activeProject.partNodes.length - getVisiblePartCount()}</strong></div>
         <div class="overview-row"><span>隔离状态</span><strong>${state.workbench.isolatedNodeIds ? "已启用" : "未启用"}</strong></div>
+        <div class="overview-row"><span>显示模式</span><strong>${escapeHtml(getDisplayModeLabel(state.workbench.displayMode))}</strong></div>
       </div>
     </div>
     <div class="panel-card">
-      <h4>显示操作</h4>
-      <p>当前目标：${escapeHtml(selectedLabel)}</p>
-      <div class="control-grid">
-        <button class="secondary-button" data-action="show-all">显示全部</button>
-        <button class="secondary-button" data-action="toggle-visibility" data-node-id="${selection?.nodeId || ""}" ${selection ? "" : "disabled"}>切换选中显隐</button>
-        <button class="secondary-button" data-action="isolate-selection" ${selection ? "" : "disabled"}>隔离选中对象</button>
-        <button class="secondary-button" data-action="clear-isolation" ${state.workbench.isolatedNodeIds ? "" : "disabled"}>取消隔离</button>
+      <h4>目标对象</h4>
+      <p>输入零件 ID 或名称，多个零件可用逗号分隔；留空时默认作用于当前流程焦点或当前选中对象。</p>
+      <input
+        class="search-field"
+        type="text"
+        placeholder="例如 part_001, 支架, bolt_A"
+        value="${escapeHtml(agent.partQuery || "")}"
+        data-bind="agent-part-query"
+      />
+      <div class="inline-note" style="margin-top: 10px;">当前目标：${escapeHtml(previewTargetPartNames)}</div>
+      <div class="control-grid" style="margin-top: 12px;">
+        <button class="secondary-button" data-action="agent-isolate-parts">聚焦目标</button>
+        <button class="secondary-button" data-action="agent-hide-parts">隐藏目标</button>
+        <button class="secondary-button" data-action="reset-display-visibility">恢复默认显示</button>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>外观</h4>
+      <div>
+        <div class="panel-actions" style="margin-bottom: 8px;">
+          <h5>不透明度</h5>
+          <strong>${Math.round((Number(agent.opacityValue) || 0) * 100)}%</strong>
+        </div>
+        <input
+          type="range"
+          min="0.05"
+          max="1"
+          step="0.05"
+          value="${Math.max(0.05, Math.min(1, Number(agent.opacityValue) || 1))}"
+          data-bind="agent-opacity"
+        />
+        <p style="margin-top: 10px;">将滑杆调到 100% 再应用，就会恢复默认不透明度。</p>
+        <div class="control-grid" style="margin-top: 12px;">
+          <button class="secondary-button" data-action="agent-apply-opacity">应用到目标</button>
+        </div>
+      </div>
+      <div style="margin-top: 14px;">
+        <div class="panel-actions" style="margin-bottom: 8px;">
+          <h5>VLM 面映射</h5>
+          <strong>${state.workbench.displayMode === "face-map" ? "已启用" : "未启用"}</strong>
+        </div>
+        <p>将当前视图切换为高饱和面级配色，帮助 VLM 更稳定地区分零件面的边界与区域。</p>
+        <div class="inline-note" style="margin-top: 10px;">当前映射目标：${escapeHtml(faceMapTargetNames)}</div>
+        <div class="control-grid" style="margin-top: 12px;">
+          <button class="secondary-button" data-action="toggle-face-map-display">
+            ${
+              state.workbench.displayMode === "face-map"
+                ? canUpdateFaceMapTarget
+                  ? "更新面映射目标"
+                  : "关闭面映射"
+                : "开启面映射"
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="panel-card">
+      <h4>位移控制</h4>
+      <div class="panel-actions" style="margin-bottom: 8px;">
+        <h5>移动参数</h5>
+        <strong>${escapeHtml(moveVector)} / ${formatNumber(agent.moveDistance)} mm</strong>
+      </div>
+      <p>输入方向向量与距离后，点击按钮将目标零件沿该方向继续移动。</p>
+      <div class="agent-vector-grid" style="margin-top: 12px;">
+        <input class="search-field" type="number" step="0.1" value="${Number(agent.moveDirectionX) || 0}" data-bind="agent-move-direction-x" placeholder="方向 X" />
+        <input class="search-field" type="number" step="0.1" value="${Number(agent.moveDirectionY) || 0}" data-bind="agent-move-direction-y" placeholder="方向 Y" />
+        <input class="search-field" type="number" step="0.1" value="${Number(agent.moveDirectionZ) || 0}" data-bind="agent-move-direction-z" placeholder="方向 Z" />
+        <input class="search-field" type="number" step="0.1" value="${Number(agent.moveDistance) || 0}" data-bind="agent-move-distance" placeholder="距离 mm" />
+      </div>
+      <div class="control-grid" style="margin-top: 12px;">
+        <button class="secondary-button" data-action="agent-translate-parts">沿指定方向移动零件</button>
+        <button class="secondary-button" data-action="agent-reset-translation">恢复默认位置</button>
       </div>
     </div>
     <div class="panel-card">
       <h4>说明</h4>
-      <p>当前工作台通过显隐和隔离聚焦装配局部区域，后续可以继续映射到更真实的 CAD 内核显示控制。</p>
+      <p>显示控制现在分为目标对象、外观和位移三类操作，减少重复入口，同时保留常用能力。</p>
     </div>
   `;
 }
@@ -1854,6 +3538,10 @@ function syncViewerState() {
     selectionMode: state.workbench.selectionMode,
     hiddenNodeIds: state.workbench.hiddenNodeIds,
     isolatedNodeIds: state.workbench.isolatedNodeIds,
+    nodeOpacityMap: state.workbench.nodeOpacityMap,
+    nodeTranslationMap: state.workbench.nodeTranslationMap,
+    faceMapTargetPartIds: state.workbench.faceMapTargetPartIds,
+    displayMode: state.workbench.displayMode,
     section: state.workbench.section,
     reasoningOverlay:
       state.workbench.workspaceMode === "reasoning"
@@ -1900,8 +3588,11 @@ async function handleClick(event) {
     workspaceMode,
     basePartId,
     assemblingPartId,
+    baseFaceId,
+    assemblingFaceId,
     sequenceId,
     stepIndex,
+    agentStepIndex,
   } = actionTarget.dataset;
 
   if (action !== "toggle-project-menu" && state.openProjectMenuId) {
@@ -1936,6 +3627,14 @@ async function handleClick(event) {
     case "go-home":
       setRoute({ page: "home" });
       return;
+    case "open-model-agent-panel":
+      if (!state.workbench) {
+        return;
+      }
+      state.workbench.workspaceMode = "model";
+      state.workbench.activePanel = "agent";
+      render();
+      return;
     case "set-workspace-mode":
       if (!state.workbench) {
         return;
@@ -1948,11 +3647,26 @@ async function handleClick(event) {
         } else if (state.workbench.reasoningPanel === "transform") {
           applyReasoningOverlay(state.workbench.reasoning.data.transformOverlay);
           render();
+        } else if (state.workbench.reasoningPanel === "agent") {
+          if (state.workbench.reasoning.data.agentAnalysis.timeline?.length) {
+            applyAgentTimelineFocus(
+              state.workbench.reasoning.data.agentAnalysis.selectedTimelineIndex >= 0
+                ? state.workbench.reasoning.data.agentAnalysis.selectedTimelineIndex
+                : 0,
+              { silent: true },
+            );
+          } else {
+            applyReasoningOverlay(state.workbench.reasoning.data.constraintsOverlay);
+          }
+          render();
         } else if (state.workbench.reasoningPanel === "steps") {
           applyReasoningMatingFaceHighlight(
             state.workbench.reasoning.selection.highlightedBaseFaceId,
             state.workbench.reasoning.selection.highlightedAssemblingFaceId,
           );
+          if (!state.workbench.reasoning.data.stepVisualEvidence) {
+            await captureReasoningVisualEvidence({ silent: true });
+          }
           render();
         } else {
           applyReasoningOverlay(state.workbench.reasoning.data.constraintsOverlay);
@@ -1965,6 +3679,45 @@ async function handleClick(event) {
       return;
     case "refresh-reasoning":
       await refreshReasoningData();
+      return;
+    case "run-vlm-agent-analysis":
+      await runVlmAgentAnalysis();
+      return;
+    case "send-agent-chat":
+      await runVlmAgentAnalysis({ fromChat: true });
+      return;
+    case "agent-isolate-parts":
+      applyAgentPartIsolation();
+      return;
+    case "agent-hide-parts":
+      hideAgentTargetParts();
+      return;
+    case "agent-clear-isolation":
+      clearAgentPartIsolation();
+      return;
+    case "reset-display-visibility":
+      resetDisplayVisibilityState();
+      return;
+    case "agent-apply-opacity":
+      applyAgentPartOpacity();
+      return;
+    case "agent-reset-opacity":
+      resetAgentPartOpacity();
+      return;
+    case "agent-show-face-map":
+      enableAgentFaceMap();
+      return;
+    case "agent-hide-face-map":
+      disableAgentFaceMap();
+      return;
+    case "toggle-face-map-display":
+      toggleFaceMapDisplay();
+      return;
+    case "agent-translate-parts":
+      applyAgentPartTranslation();
+      return;
+    case "agent-reset-translation":
+      resetAgentPartTranslation();
       return;
     case "viewer-fit":
       state.viewer?.fit();
@@ -2003,6 +3756,17 @@ async function handleClick(event) {
           await loadReasoningTransform();
           return;
         }
+      } else if (panel === "agent") {
+        if (state.workbench.reasoning.data.agentAnalysis.timeline?.length) {
+          applyAgentTimelineFocus(
+            state.workbench.reasoning.data.agentAnalysis.selectedTimelineIndex >= 0
+              ? state.workbench.reasoning.data.agentAnalysis.selectedTimelineIndex
+              : 0,
+            { silent: true },
+          );
+        } else {
+          applyReasoningOverlay(state.workbench.reasoning.data.constraintsOverlay);
+        }
       } else if (panel === "steps") {
         applyReasoningMatingFaceHighlight(
           state.workbench.reasoning.selection.highlightedBaseFaceId,
@@ -2011,6 +3775,9 @@ async function handleClick(event) {
         if (!state.workbench.reasoning.data.stepExplanation) {
           await loadReasoningStep({ capturePreview: true });
           return;
+        }
+        if (!state.workbench.reasoning.data.stepVisualEvidence) {
+          await captureReasoningVisualEvidence({ silent: true });
         }
       } else if (panel === "constraints") {
         applyReasoningOverlay(state.workbench.reasoning.data.constraintsOverlay);
@@ -2031,6 +3798,7 @@ async function handleClick(event) {
       return;
     case "highlight-reasoning-mating-face":
       applyReasoningMatingFaceHighlight(baseFaceId, assemblingFaceId);
+      await captureReasoningVisualEvidence({ silent: true });
       render();
       return;
     case "refresh-reasoning-transform":
@@ -2038,6 +3806,9 @@ async function handleClick(event) {
       return;
     case "refresh-reasoning-step":
       await loadReasoningStep();
+      return;
+    case "select-agent-step":
+      applyAgentTimelineFocus(Number(agentStepIndex || 0));
       return;
     case "toggle-node":
       toggleExpandedNode(nodeId);
@@ -2098,6 +3869,47 @@ function handleInput(event) {
 
   if (bind === "tree-search") {
     state.workbench.treeSearch = target.value;
+    render({ preserveBoundInput: true });
+    return;
+  }
+
+  if (bind === "agent-part-query") {
+    state.workbench.reasoning.data.agentAnalysis.partQuery = target.value;
+    render({ preserveBoundInput: true });
+    return;
+  }
+
+  if (bind === "agent-chat-input") {
+    state.workbench.reasoning.data.agentAnalysis.chatInput = target.value;
+    return;
+  }
+
+  if (bind === "agent-opacity") {
+    state.workbench.reasoning.data.agentAnalysis.opacityValue = Number(target.value);
+    render({ preserveBoundInput: true });
+    return;
+  }
+
+  if (bind === "agent-move-direction-x") {
+    state.workbench.reasoning.data.agentAnalysis.moveDirectionX = Number(target.value);
+    render({ preserveBoundInput: true });
+    return;
+  }
+
+  if (bind === "agent-move-direction-y") {
+    state.workbench.reasoning.data.agentAnalysis.moveDirectionY = Number(target.value);
+    render({ preserveBoundInput: true });
+    return;
+  }
+
+  if (bind === "agent-move-direction-z") {
+    state.workbench.reasoning.data.agentAnalysis.moveDirectionZ = Number(target.value);
+    render({ preserveBoundInput: true });
+    return;
+  }
+
+  if (bind === "agent-move-distance") {
+    state.workbench.reasoning.data.agentAnalysis.moveDistance = Number(target.value);
     render({ preserveBoundInput: true });
     return;
   }
@@ -2718,6 +4530,11 @@ async function handleWindowDrop(event) {
     await importFiles(filePaths);
   }
 }
+
+
+
+
+
 
 
 

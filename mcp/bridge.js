@@ -1,4 +1,4 @@
-const { randomUUID } = require("crypto");
+﻿const { randomUUID } = require("crypto");
 
 let windowProvider = null;
 let rendererState = {
@@ -62,7 +62,7 @@ function handleCommandResponse(payload) {
 function requestRendererCapture(options = {}) {
   const targetWindow = windowProvider ? windowProvider() : null;
   if (!targetWindow || targetWindow.isDestroyed()) {
-    throw new Error("没有可用的窗口用于截图。");
+    throw new Error("No available window for renderer capture.");
   }
 
   const requestId = randomUUID();
@@ -70,7 +70,7 @@ function requestRendererCapture(options = {}) {
   return new Promise((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       pendingCaptures.delete(requestId);
-      reject(new Error("等待 renderer capture 响应超时。"));
+      reject(new Error("Timed out waiting for renderer capture response."));
     }, 15000);
 
     pendingCaptures.set(requestId, {
@@ -89,16 +89,17 @@ function requestRendererCapture(options = {}) {
 function requestRendererCommand(options = {}) {
   const targetWindow = windowProvider ? windowProvider() : null;
   if (!targetWindow || targetWindow.isDestroyed()) {
-    throw new Error("没有可用的窗口用于执行命令。");
+    throw new Error("No available window for renderer command execution.");
   }
 
   const requestId = randomUUID();
 
   return new Promise((resolve, reject) => {
+    const timeoutMs = Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : 30000;
     const timeoutId = setTimeout(() => {
       pendingCommands.delete(requestId);
-      reject(new Error("等待 renderer command 响应超时。"));
-    }, 15000);
+      reject(new Error("Timed out waiting for renderer command response."));
+    }, timeoutMs);
 
     pendingCommands.set(requestId, {
       resolve,
