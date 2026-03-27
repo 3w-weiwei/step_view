@@ -67,9 +67,43 @@ function buildPartMap(details) {
   return new Map((details.assembly?.nodes || []).filter((node) => node.kind === "part").map((node) => [node.id, node]));
 }
 
-function buildTree(nodeMap, nodeId, maxDepth, depth = 0) {
+function sanitizeScopedPartIds(partMap, partIds = []) {
+  return unique(Array.isArray(partIds) ? partIds : [partIds]).filter((partId) => partMap.has(partId));
+}
+
+function buildParentMap(details) {
+  const parentMap = new Map();
+  (details.assembly?.nodes || []).forEach((node) => {
+    (node.children || []).forEach((childId) => {
+      parentMap.set(childId, node.id);
+    });
+  });
+  return parentMap;
+}
+
+function buildScopedNodeIds(details, partIds = []) {
+  if (!partIds.length) {
+    return null;
+  }
+
+  const nodeMap = buildNodeMap(details);
+  const parentMap = buildParentMap(details);
+  const scopedNodeIds = new Set();
+
+  partIds.forEach((partId) => {
+    let currentId = partId;
+    while (currentId && nodeMap.has(currentId) && !scopedNodeIds.has(currentId)) {
+      scopedNodeIds.add(currentId);
+      currentId = parentMap.get(currentId) || null;
+    }
+  });
+
+  return scopedNodeIds;
+}
+
+function buildTree(nodeMap, nodeId, maxDepth, depth = 0, allowedNodeIds = null) {
   const node = nodeMap.get(nodeId);
-  if (!node) {
+  if (!node || (allowedNodeIds && !allowedNodeIds.has(nodeId))) {
     return null;
   }
 
@@ -84,7 +118,7 @@ function buildTree(nodeMap, nodeId, maxDepth, depth = 0) {
 
   if (maxDepth == null || depth < maxDepth - 1) {
     payload.children = (node.children || [])
-      .map((childId) => buildTree(nodeMap, childId, maxDepth, depth + 1))
+      .map((childId) => buildTree(nodeMap, childId, maxDepth, depth + 1, allowedNodeIds))
       .filter(Boolean);
   }
 
@@ -227,7 +261,9 @@ function buildRelationCandidates(details, options = {}) {
 }
 
 function buildSubassemblyCandidates(details, relationCandidates, options = {}) {
-  const partIds = [...buildPartMap(details).keys()];
+  const partMap = buildPartMap(details);
+  const scopedPartIds = sanitizeScopedPartIds(partMap, options.partIds);
+  const partIds = scopedPartIds.length ? scopedPartIds : [...partMap.keys()];
   const threshold = options.threshold || 0.58;
   const adjacency = new Map(partIds.map((partId) => [partId, new Set()]));
 
@@ -307,14 +343,18 @@ function buildSubassemblyCandidates(details, relationCandidates, options = {}) {
 
 function buildGraspCandidates(details, relationCandidates, options = {}) {
   const partMap = buildPartMap(details);
+  const scopedPartIds = sanitizeScopedPartIds(partMap, options.partIds);
+  const parts = scopedPartIds.length
+    ? scopedPartIds.map((partId) => partMap.get(partId)).filter(Boolean)
+    : [...partMap.values()];
   const maxFaceArea = Math.max(
     1,
-    ...[...partMap.values()].flatMap((part) => (part.faces || []).map((face) => face.area || 0)),
+    ...parts.flatMap((part) => (part.faces || []).map((face) => face.area || 0)),
   );
 
   const candidates = [];
 
-  partMap.forEach((part) => {
+  parts.forEach((part) => {
     const planarFaces = (part.faces || []).filter((face) => face.geometry?.type === "plane").sort((left, right) => (right.area || 0) - (left.area || 0));
     const cylindricalFaces = (part.faces || []).filter((face) => face.geometry?.type === "cylinder").sort((left, right) => (right.area || 0) - (left.area || 0));
     const avoidFaceIds = unique(
@@ -384,10 +424,19 @@ function buildGraspCandidates(details, relationCandidates, options = {}) {
 }
 
 function buildAnalysisCandidates(details, options = {}) {
-  const relationCandidates = buildRelationCandidates(details, options);
-  const baseCandidates = buildBasePartCandidates(details, { topK: options.baseTopK || 8 });
-  const subassemblyCandidates = buildSubassemblyCandidates(details, relationCandidates, options);
-  const graspCandidates = buildGraspCandidates(details, relationCandidates, options);
+  const partMap = buildPartMap(details);
+  const scopedPartIds = sanitizeScopedPartIds(partMap, options.partIds);
+  const scopedOptions = {
+    ...options,
+    partIds: scopedPartIds.length ? scopedPartIds : undefined,
+  };
+  const relationCandidates = buildRelationCandidates(details, scopedOptions);
+  const baseCandidates = buildBasePartCandidates(details, {
+    topK: options.baseTopK || 8,
+    partIds: scopedOptions.partIds,
+  });
+  const subassemblyCandidates = buildSubassemblyCandidates(details, relationCandidates, scopedOptions);
+  const graspCandidates = buildGraspCandidates(details, relationCandidates, scopedOptions);
   const candidateMap = new Map();
 
   relationCandidates.forEach((candidate) => candidateMap.set(candidate.candidateId, { type: "relation", candidate }));
@@ -407,9 +456,14 @@ function buildAnalysisCandidates(details, options = {}) {
 function buildModelContext(details, options = {}) {
   const nodeMap = buildNodeMap(details);
   const partMap = buildPartMap(details);
+  const scopedPartIds = sanitizeScopedPartIds(partMap, options.partIds);
+  const scopedNodeIds = buildScopedNodeIds(details, scopedPartIds);
   const maxVolume = Math.max(1, ...[...partMap.values()].map((part) => bboxVolume(part.bbox)));
   const maxFaceCountPerPart = Math.max(1, options.maxFaceCountPerPart || 256);
-  const includeFaces = options.includeFaces !== false;
+  const includeFaces = options.summaryOnly ? false : options.includeFaces !== false;
+  const parts = scopedPartIds.length
+    ? scopedPartIds.map((partId) => partMap.get(partId)).filter(Boolean)
+    : [...partMap.values()];
 
   return {
     projectId: details.manifest.projectId,
@@ -417,6 +471,16 @@ function buildModelContext(details, options = {}) {
     modelName: details.manifest.modelName || details.assembly?.meta?.sourceModelName || details.manifest.projectName,
     parserMode: details.manifest.parserMode,
     geometryMode: details.manifest.geometryMode,
+    scope: {
+      partIds: scopedPartIds,
+      isPartial: scopedPartIds.length > 0,
+      returnedPartCount: parts.length,
+      totalPartCount: details.manifest.partCount || partMap.size,
+      maxDepth: options.maxDepth ?? null,
+      summaryOnly: Boolean(options.summaryOnly),
+      includeFaces,
+      maxFaceCountPerPart: includeFaces ? maxFaceCountPerPart : 0,
+    },
     assembly: {
       rootId: details.assembly?.rootId || null,
       partCount: details.manifest.partCount || 0,
@@ -424,8 +488,8 @@ function buildModelContext(details, options = {}) {
       assemblyCount: details.manifest.assemblyCount || 0,
       bounds: details.assembly?.bounds || null,
     },
-    tree: buildTree(nodeMap, details.assembly?.rootId, options.maxDepth),
-    parts: [...partMap.values()].map((part) => ({
+    tree: buildTree(nodeMap, details.assembly?.rootId, options.maxDepth, 0, scopedNodeIds),
+    parts: parts.map((part) => ({
       partId: part.id,
       name: part.name,
       pathNames: part.pathNames,
@@ -435,6 +499,187 @@ function buildModelContext(details, options = {}) {
       facesTruncated: (part.faces || []).length > maxFaceCountPerPart,
       faces: includeFaces ? (part.faces || []).slice(0, maxFaceCountPerPart).map(summarizeFace) : [],
     })),
+  };
+}
+
+function toBoundedInteger(value, fallback, min, max) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+  return clamp(Math.round(numericValue), min, max);
+}
+
+function normalizeCandidateTypes(candidateTypes = []) {
+  const aliases = {
+    relation: "relation",
+    relations: "relation",
+    base: "base",
+    base_part: "base",
+    basepart: "base",
+    subassembly: "subassembly",
+    subassemblies: "subassembly",
+    grasp: "grasp",
+    grasps: "grasp",
+  };
+
+  const normalized = unique((Array.isArray(candidateTypes) ? candidateTypes : [candidateTypes])
+    .map((item) => aliases[String(item || "").trim().toLowerCase()] || null)
+    .filter(Boolean));
+
+  return normalized.length ? normalized : ["relation", "base", "subassembly", "grasp"];
+}
+
+function formatModelContextPartForTool(part, includeFaces) {
+  const payload = {
+    partId: part.partId,
+    name: part.name,
+    pathNames: part.pathNames,
+    bbox: part.bbox,
+    tags: part.tags,
+    faceCount: part.faceCount,
+    facesTruncated: part.facesTruncated,
+  };
+
+  if (includeFaces) {
+    payload.faces = part.faces;
+  }
+
+  return payload;
+}
+
+function buildModelContextToolPayload(details, options = {}) {
+  const summaryOnly = options.summaryOnly == null ? options.includeFaces !== true : Boolean(options.summaryOnly);
+  const includeFaces = !summaryOnly && options.includeFaces === true;
+  const maxDepth = toBoundedInteger(options.maxDepth, summaryOnly ? 3 : 5, 1, 12);
+  const maxFaceCountPerPart = toBoundedInteger(options.maxFaceCountPerPart, 24, 1, 256);
+  const payload = buildModelContext(details, {
+    partIds: options.partIds,
+    maxDepth,
+    includeFaces,
+    maxFaceCountPerPart,
+    summaryOnly,
+  });
+
+  return {
+    projectId: payload.projectId,
+    projectName: payload.projectName,
+    modelName: payload.modelName,
+    parserMode: payload.parserMode,
+    geometryMode: payload.geometryMode,
+    scope: payload.scope,
+    assembly: payload.assembly,
+    tree: payload.tree,
+    parts: payload.parts.map((part) => formatModelContextPartForTool(part, includeFaces)),
+  };
+}
+
+function limitEvidenceEntries(values, limit) {
+  return Array.isArray(values) ? values.slice(0, limit) : [];
+}
+
+function formatRelationCandidateForTool(candidate, includeEvidence, evidenceLimit) {
+  return {
+    candidateId: candidate.candidateId,
+    order: candidate.order,
+    partAId: candidate.partAId,
+    partAName: candidate.partAName,
+    partBId: candidate.partBId,
+    partBName: candidate.partBName,
+    featureGroupA: candidate.featureGroupA,
+    featureGroupB: candidate.featureGroupB,
+    relationType: candidate.relationType,
+    sharedAxis: candidate.sharedAxis,
+    bboxGap: candidate.bboxGap,
+    score: candidate.score,
+    ruleEvidence: includeEvidence ? limitEvidenceEntries(candidate.ruleEvidence, evidenceLimit) : [],
+    facePairs: includeEvidence ? limitEvidenceEntries(candidate.facePairs, evidenceLimit) : [],
+  };
+}
+
+function formatBaseCandidateForTool(candidate, includeEvidence, evidenceLimit) {
+  return {
+    partId: candidate.partId,
+    name: candidate.name,
+    score: candidate.score,
+    volumeScore: candidate.volumeScore,
+    supportAreaScore: candidate.supportAreaScore,
+    connectivityScore: candidate.connectivityScore,
+    centerBias: candidate.centerBias,
+    reasons: includeEvidence ? limitEvidenceEntries(candidate.reasons, evidenceLimit) : [],
+  };
+}
+
+function formatSubassemblyCandidateForTool(candidate, includeEvidence, evidenceLimit) {
+  return {
+    candidateId: candidate.candidateId,
+    partIds: candidate.partIds,
+    score: candidate.score,
+    internalScore: candidate.internalScore,
+    externalScore: candidate.externalScore,
+    reasons: includeEvidence ? limitEvidenceEntries(candidate.reasons, evidenceLimit) : [],
+  };
+}
+
+function formatGraspCandidateForTool(candidate, includeEvidence, evidenceLimit) {
+  return {
+    candidateId: candidate.candidateId,
+    partId: candidate.partId,
+    partName: candidate.partName,
+    featureGroup: candidate.featureGroup,
+    recommendedGripperTypes: candidate.recommendedGripperTypes,
+    approachDirections: candidate.approachDirections,
+    referenceAxis: candidate.referenceAxis || null,
+    avoidFaceIds: includeEvidence ? limitEvidenceEntries(candidate.avoidFaceIds, evidenceLimit) : [],
+    score: candidate.score,
+  };
+}
+
+function buildRelationCandidatesToolPayload(details, options = {}) {
+  const partMap = buildPartMap(details);
+  const scopedPartIds = sanitizeScopedPartIds(partMap, options.partIds);
+  const topK = toBoundedInteger(options.topK, 12, 1, 64);
+  const candidateTypes = normalizeCandidateTypes(
+    options.candidateTypes?.length
+      ? options.candidateTypes
+      : [
+          "relation",
+          options.includeBaseCandidates === false ? null : "base",
+          options.includeSubassemblyCandidates === false ? null : "subassembly",
+          options.includeGraspCandidates === false ? null : "grasp",
+        ],
+  );
+  const includeEvidence = Boolean(options.includeEvidence);
+  const evidenceLimit = toBoundedInteger(options.evidenceLimit, 4, 1, 12);
+  const payload = buildAnalysisCandidates(details, {
+    partIds: scopedPartIds,
+    topK,
+    baseTopK: Math.min(topK, 8),
+  });
+
+  return {
+    projectId: details.manifest.projectId,
+    projectName: details.manifest.projectName,
+    scope: {
+      partIds: scopedPartIds,
+      isPartial: scopedPartIds.length > 0,
+      candidateTypes,
+      topK,
+      includeEvidence,
+      evidenceLimit,
+    },
+    relationCandidates: candidateTypes.includes("relation")
+      ? payload.relationCandidates.slice(0, topK).map((candidate) => formatRelationCandidateForTool(candidate, includeEvidence, evidenceLimit))
+      : [],
+    baseCandidates: candidateTypes.includes("base")
+      ? payload.baseCandidates.slice(0, Math.min(topK, 8)).map((candidate) => formatBaseCandidateForTool(candidate, includeEvidence, evidenceLimit))
+      : [],
+    subassemblyCandidates: candidateTypes.includes("subassembly")
+      ? payload.subassemblyCandidates.slice(0, Math.min(topK, 8)).map((candidate) => formatSubassemblyCandidateForTool(candidate, includeEvidence, evidenceLimit))
+      : [],
+    graspCandidates: candidateTypes.includes("grasp")
+      ? payload.graspCandidates.slice(0, Math.min(topK, 12)).map((candidate) => formatGraspCandidateForTool(candidate, includeEvidence, evidenceLimit))
+      : [],
   };
 }
 
@@ -837,7 +1082,9 @@ function validateHypothesis(details, hypothesis = {}, options = {}) {
 
 module.exports = {
   buildModelContext,
+  buildModelContextToolPayload,
   buildAnalysisCandidates,
+  buildRelationCandidatesToolPayload,
   buildEvidenceTarget,
   validateHypothesis,
 };

@@ -2,3 +2,4 @@ node_modules/
 project-data/
 dist/
 *.log
+/test/output

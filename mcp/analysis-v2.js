@@ -227,6 +227,11 @@ function buildPartMap(details) {
   return new Map((details.assembly?.nodes || []).filter((node) => node.kind === "part").map((node) => [node.id, node]));
 }
 
+function sanitizeScopedPartIds(partMap, partIds = []) {
+  return [...new Set((Array.isArray(partIds) ? partIds : [partIds]).filter(Boolean))]
+    .filter((partId) => partMap.has(partId));
+}
+
 function computePairCandidates(partA, partB) {
   const candidates = [];
   for (const faceA of partA.faces || []) {
@@ -356,8 +361,15 @@ function buildMatingCandidates(details, options = {}) {
 
 function buildBasePartCandidates(details, options = {}) {
   const partMap = buildPartMap(details);
-  const parts = [...partMap.values()];
-  const pairCandidates = buildMatingCandidates(details, { topK: 128, facePairLimit: 2 });
+  const scopedPartIds = sanitizeScopedPartIds(partMap, options.partIds);
+  const parts = scopedPartIds.length
+    ? scopedPartIds.map((partId) => partMap.get(partId)).filter(Boolean)
+    : [...partMap.values()];
+  const pairCandidates = buildMatingCandidates(details, {
+    partIds: scopedPartIds.length ? scopedPartIds : undefined,
+    topK: Math.max(options.topK || 128, 32),
+    facePairLimit: 2,
+  });
   const connectivityMap = new Map(parts.map((part) => [part.id, { degree: 0, score: 0 }]));
 
   pairCandidates.forEach((candidate) => {

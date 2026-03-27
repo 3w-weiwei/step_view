@@ -1,4 +1,5 @@
 ﻿const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { randomUUID } = require("crypto");
 const fs = require("fs/promises");
 const path = require("path");
 const { startMcpHttpServer } = require("./mcp/http-server");
@@ -20,8 +21,9 @@ const {
 } = require("./mcp/reasoning-service");
 const {
   buildModelContext,
+  buildModelContextToolPayload,
   buildAnalysisCandidates,
-  buildEvidenceTarget,
+  buildRelationCandidatesToolPayload,
 } = require("./mcp/analysis-v3");
 
 const {
@@ -85,22 +87,24 @@ const VLM_SYSTEM_PROMPT = [
 ].join("\n");
 const VLM_AGENT_TOOL_LOOP_PROMPT = [
   "你是一个 CAD 装配分析智能体。",
-  "你必须根据用户指令完成任务，并优先使用显示控制工具逐步观察装配体，然后再输出最终分析。",
-  "每一轮严格只返回 JSON，不要输出 Markdown 或解释性文本。",
+  "你必须根据用户指令完成任务，可以先使用轻量上下文工具缩小范围，再使用显示控制工具观察装配体，最后输出分析结论。",
+  "每一轮必须只返回 JSON，不要输出 Markdown 或解释性文本。",
   "可用工具：",
-  '1. focus_parts: {"part_ids":["partId"]} 只聚焦指定零件。',
+  '1. focus_parts: {"part_ids":["partId"]} 聚焦指定零件。',
   '2. hide_parts: {"part_ids":["partId"]} 隐藏指定零件。',
-  '3. set_part_opacity: {"part_ids":["partId"],"opacity":0.05-1} 设置指定零件不透明度。',
-  '4. set_face_map: {"part_ids":["partId"]} 仅对指定零件显示高饱和面映射。',
-  '5. move_parts: {"part_ids":["partId"],"direction":{"x":0,"y":0,"z":1},"distance":10} 沿方向移动零件。',
-  '6. reset_display: {} 恢复默认显示范围和普通显示模式。',
+  '3. set_part_opacity: {"part_ids":["partId"],"opacity":0.05-1} 调整指定零件透明度。',
+  '4. set_face_map: {"part_ids":["partId"]} 仅对指定零件显示面映射。',
+  '5. move_parts: {"part_ids":["partId"],"direction":{"x":0,"y":0,"z":1},"distance":10} 沿指定方向移动零件。',
+  '6. reset_display: {} 恢复默认显示状态。',
   '7. reset_translation: {"part_ids":["partId"]} 或 {} 恢复零件默认位置。',
-  '8. capture_views: {"presets":["front","left","top","right","back","bottom","iso"],"mode":"beauty"|"face-mask"|"id-mask"} 获取指定视角截图。',
+  '8. capture_views: {"presets":["front","left","top","right","back","bottom","iso"],"mode":"beauty"|"face-mask"|"id-mask"} 获取截图。',
+  '9. get_model_context: {"part_ids":["partId"],"max_depth":3,"include_faces":false,"max_face_count_per_part":24,"summary_only":true} 获取全局或局部模型上下文，优先使用摘要模式。',
+  '10. get_relation_candidates: {"part_ids":["partId"],"top_k":8,"candidate_types":["relation","base","subassembly","grasp"],"include_evidence":false,"evidence_limit":4} 获取候选关系，先轻量召回，再在锁定 2 到 6 个零件后细取局部细节。',
   "返回 JSON 结构：",
   "{",
   '  "mode": "tool" | "final",',
   '  "stage_title": "阶段标题",',
-  '  "stage_goal": "本阶段目标",',
+  '  "stage_goal": "阶段目标",',
   '  "rationale": "为什么这样做",',
   '  "tool_call": { "name": "工具名", "arguments": { ... } },',
   '  "final": {',
@@ -134,6 +138,7 @@ const VLM_AGENT_TOOL_LOOP_PROMPT = [
   "- 在至少调用一次工具前，不要直接返回 final。",
   "- 每次 mode=tool 时只能调用一个工具。",
   "- partId 和 faceId 必须来自已提供上下文。",
+  "- 优先先做摘要检索，再做局部细节检索。",
 ].join("\n");
 const MAX_VLM_AGENT_TOOL_STEPS = 30;
 
@@ -152,6 +157,67 @@ function trimTrailingSlash(value = "") {
 
 function unique(values = []) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function formatJsonlTimestamp(value = new Date()) {
+  return new Date(value).toISOString().replace(/[:.]/g, "-");
+}
+
+async function createVlmConversationLogger({
+  projectId,
+  projectName,
+  instruction,
+  model,
+  endpoint,
+  conversationHistory,
+  selection,
+}) {
+  const sessionId = randomUUID();
+  const logDirectory = path.join(getProjectDirectory(projectId), "agent-chat-logs");
+  await fs.mkdir(logDirectory, { recursive: true });
+
+  const logFilePath = path.join(logDirectory, `${formatJsonlTimestamp()}-${sessionId}.jsonl`);
+  let writeQueue = Promise.resolve();
+  let writeFailed = false;
+
+  function append(eventType, payload = {}) {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      sessionId,
+      eventType,
+      ...payload,
+    };
+
+    writeQueue = writeQueue
+      .then(() => fs.appendFile(logFilePath, `${JSON.stringify(entry)}\n`, "utf8"))
+      .catch((error) => {
+        if (!writeFailed) {
+          writeFailed = true;
+          console.error("Failed to append VLM conversation log:", error);
+        }
+      });
+
+    return writeQueue;
+  }
+
+  await append("session_start", {
+    projectId,
+    projectName,
+    instruction,
+    model,
+    endpoint,
+    conversationHistory: Array.isArray(conversationHistory) ? conversationHistory : [],
+    selection: selection || {},
+  });
+
+  return {
+    sessionId,
+    logFilePath,
+    append,
+    flush() {
+      return writeQueue;
+    },
+  };
 }
 
 function resolveVlmConfig(payload = {}) {
@@ -530,6 +596,13 @@ function normalizeToolName(name) {
     capture_views: "capture_views",
     captureviews: "capture_views",
     screenshot: "capture_views",
+    get_model_context: "get_model_context",
+    getmodelcontext: "get_model_context",
+    model_context: "get_model_context",
+    get_relation_candidates: "get_relation_candidates",
+    getrelationcandidates: "get_relation_candidates",
+    relation_candidates: "get_relation_candidates",
+    relationcandidates: "get_relation_candidates",
   };
   return aliases[normalized] || null;
 }
@@ -551,6 +624,50 @@ function sanitizeCapturePresets(presets = []) {
   return normalized.length ? normalized.slice(0, 4) : ["iso"];
 }
 
+function sanitizeAgentBoolean(value, fallback = false) {
+  if (value == null) {
+    return fallback;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "1", "yes"].includes(normalized)) {
+    return true;
+  }
+  if (["false", "0", "no"].includes(normalized)) {
+    return false;
+  }
+  return fallback;
+}
+
+function sanitizeAgentCandidateTypes(rawCandidateTypes = [], rawArgs = {}) {
+  const directTypes = Array.isArray(rawCandidateTypes) && rawCandidateTypes.length
+    ? rawCandidateTypes
+    : [
+        "relation",
+        sanitizeAgentBoolean(rawArgs.include_base_candidates ?? rawArgs.includeBaseCandidates, true) ? "base" : null,
+        sanitizeAgentBoolean(rawArgs.include_subassembly_candidates ?? rawArgs.includeSubassemblyCandidates, true) ? "subassembly" : null,
+        sanitizeAgentBoolean(rawArgs.include_grasp_candidates ?? rawArgs.includeGraspCandidates, true) ? "grasp" : null,
+      ];
+  const aliases = {
+    relation: "relation",
+    relations: "relation",
+    base: "base",
+    base_part: "base",
+    basepart: "base",
+    subassembly: "subassembly",
+    subassemblies: "subassembly",
+    grasp: "grasp",
+    grasps: "grasp",
+  };
+  const normalized = unique((Array.isArray(directTypes) ? directTypes : [directTypes])
+    .map((item) => aliases[String(item || "").trim().toLowerCase()] || null)
+    .filter(Boolean));
+  return normalized.length ? normalized : ["relation", "base", "subassembly", "grasp"];
+}
+
 function sanitizeAgentToolCall(details, decision) {
   const toolName = normalizeToolName(decision?.toolCall?.name);
   if (!toolName) {
@@ -564,10 +681,38 @@ function sanitizeAgentToolCall(details, decision) {
   );
 
   if (["focus_parts", "hide_parts", "set_part_opacity", "set_face_map", "move_parts"].includes(toolName) && !partIds.length) {
-    throw new Error(`工具 ${toolName} 缺少有效 part_ids。`);
+    throw new Error("工具 " + toolName + " 缺少有效的 part_ids。");
   }
 
   switch (toolName) {
+    case "get_model_context": {
+      const requestedFaces = sanitizeAgentBoolean(rawArgs.include_faces ?? rawArgs.includeFaces, false);
+      const summaryOnly =
+        rawArgs.summary_only == null && rawArgs.summaryOnly == null
+          ? !requestedFaces
+          : sanitizeAgentBoolean(rawArgs.summary_only ?? rawArgs.summaryOnly, true);
+      return {
+        name: toolName,
+        arguments: {
+          partIds,
+          maxDepth: clamp(Math.round(toFiniteNumber(rawArgs.max_depth ?? rawArgs.maxDepth, summaryOnly ? 3 : 5)), 1, 12),
+          includeFaces: !summaryOnly && requestedFaces,
+          maxFaceCountPerPart: clamp(Math.round(toFiniteNumber(rawArgs.max_face_count_per_part ?? rawArgs.maxFaceCountPerPart, 24)), 1, 256),
+          summaryOnly,
+        },
+      };
+    }
+    case "get_relation_candidates":
+      return {
+        name: toolName,
+        arguments: {
+          partIds,
+          topK: clamp(Math.round(toFiniteNumber(rawArgs.top_k ?? rawArgs.topK, 12)), 1, 64),
+          candidateTypes: sanitizeAgentCandidateTypes(rawArgs.candidate_types || rawArgs.candidateTypes, rawArgs),
+          includeEvidence: sanitizeAgentBoolean(rawArgs.include_evidence ?? rawArgs.includeEvidence, false),
+          evidenceLimit: clamp(Math.round(toFiniteNumber(rawArgs.evidence_limit ?? rawArgs.evidenceLimit, 4)), 1, 12),
+        },
+      };
     case "capture_views":
       return {
         name: toolName,
@@ -605,7 +750,7 @@ function sanitizeAgentToolCall(details, decision) {
       );
       const distance = Math.abs(toFiniteNumber(rawArgs.distance, 0));
       if (!distance) {
-        throw new Error("move_parts 缺少有效 distance。");
+        throw new Error("move_parts 缺少有效的 distance。");
       }
       return {
         name: toolName,
@@ -629,7 +774,7 @@ function sanitizeAgentToolCall(details, decision) {
         },
       };
     default:
-      throw new Error(`未支持的工具：${toolName}`);
+      throw new Error("暂不支持的工具：" + toolName);
   }
 }
 
@@ -668,6 +813,30 @@ function extractCaptureImages(captureResult, labelPrefix = "observation") {
   return images.slice(0, 2);
 }
 
+function summarizeObservationImagesForLog(images = []) {
+  return (Array.isArray(images) ? images : []).map((item) => ({
+    label: item?.label || "",
+    preset: item?.preset || null,
+  }));
+}
+
+function summarizeToolResultForLog(toolResult, currentDisplayState, observation) {
+  if (toolResult?.type === "analysis") {
+    return {
+      type: "analysis",
+      summary: toolResult.summary || "",
+      payload: toolResult.payload || null,
+      displayState: currentDisplayState || {},
+    };
+  }
+
+  return {
+    type: toolResult?.type || "display",
+    displayState: currentDisplayState || {},
+    observationImages: summarizeObservationImagesForLog(observation?.images),
+  };
+}
+
 function buildAgentToolInitialPrompt({
   userInstruction,
   conversationHistory,
@@ -678,16 +847,17 @@ function buildAgentToolInitialPrompt({
   currentDisplayState,
 }) {
   return [
-    "请先理解用户指令，再观察当前装配体，并决定下一步使用哪个显示控制工具。",
-    "你会在每次工具调用后收到新的观察图像。",
+    "请先理解用户请求，再结合下面的轻量摘要选择下一步工具。",
+    "推荐策略：先用 get_model_context / get_relation_candidates 的摘要模式缩小范围，锁定 2 到 6 个相关零件后再获取局部细节，只有在需要视觉确认时再调用显示工具。",
+    "调用显示工具后你会收到新的图像，调用上下文工具后你会收到结构化 JSON 结果。",
     "",
     "用户指令：",
-    String(userInstruction || "请对当前装配体进行分析，并完成用户请求。"),
+    String(userInstruction || "请分析当前装配体并完成任务。"),
     "",
     "对话历史摘要：",
     JSON.stringify(conversationHistory || [], null, 2),
     "",
-    "模型上下文：",
+    "模型上下文摘要：",
     JSON.stringify(contextSummary, null, 2),
     "",
     "候选摘要：",
@@ -749,8 +919,43 @@ async function captureAgentObservation(projectId, labelPrefix = "agent") {
   };
 }
 
-async function executeAgentDisplayTool(projectId, toolCall) {
+async function executeAgentTool(details, projectId, toolCall) {
   switch (toolCall.name) {
+    case "get_model_context": {
+      const payload = buildModelContextToolPayload(details, {
+        partIds: toolCall.arguments.partIds,
+        maxDepth: toolCall.arguments.maxDepth,
+        includeFaces: toolCall.arguments.includeFaces,
+        maxFaceCountPerPart: toolCall.arguments.maxFaceCountPerPart,
+        summaryOnly: toolCall.arguments.summaryOnly,
+      });
+      return {
+        type: "analysis",
+        payload,
+        summary: "已返回 " + payload.parts.length + " 个零件的模型上下文。",
+        rendererState: getRendererState(),
+      };
+    }
+    case "get_relation_candidates": {
+      const payload = buildRelationCandidatesToolPayload(details, {
+        partIds: toolCall.arguments.partIds,
+        topK: toolCall.arguments.topK,
+        candidateTypes: toolCall.arguments.candidateTypes,
+        includeEvidence: toolCall.arguments.includeEvidence,
+        evidenceLimit: toolCall.arguments.evidenceLimit,
+      });
+      const totalCount =
+        (payload.relationCandidates?.length || 0) +
+        (payload.baseCandidates?.length || 0) +
+        (payload.subassemblyCandidates?.length || 0) +
+        (payload.graspCandidates?.length || 0);
+      return {
+        type: "analysis",
+        payload,
+        summary: "已返回 " + totalCount + " 个候选项。",
+        rendererState: getRendererState(),
+      };
+    }
     case "capture_views": {
       const captureResult = await requestRendererCapture({
         projectId,
@@ -839,7 +1044,7 @@ async function executeAgentDisplayTool(projectId, toolCall) {
         }),
       };
     default:
-      throw new Error(`未知工具调用：${toolCall.name}`);
+      throw new Error("Unknown tool call: " + toolCall.name);
   }
 }
 
@@ -1039,7 +1244,9 @@ async function getReasoningProjectDetails(projectId) {
 async function runVlmAgentAnalysis(payload = {}) {
   const details = await getReasoningProjectDetails(payload?.projectId);
   const projectId = details.manifest.projectId;
+  const projectName = details.manifest.projectName;
   const config = resolveVlmConfig(payload || {});
+  const endpoint = `${config.baseUrl}/chat/completions`;
   const userInstruction = String(payload?.instruction || "").trim();
   const conversationHistory = Array.isArray(payload?.conversationHistory)
     ? payload.conversationHistory
@@ -1051,6 +1258,27 @@ async function runVlmAgentAnalysis(payload = {}) {
         .filter((item) => item.content)
         .slice(-8)
     : [];
+  const selection = payload?.selection || {};
+  const logger = await createVlmConversationLogger({
+    projectId,
+    projectName,
+    instruction: userInstruction,
+    model: config.model,
+    endpoint,
+    conversationHistory,
+    selection,
+  }).catch((error) => {
+    console.error("Failed to create VLM conversation logger:", error);
+    return null;
+  });
+  const appendConversationLog = async (eventType, eventPayload = {}) => {
+    if (!logger) {
+      return;
+    }
+    await logger.append(eventType, eventPayload);
+  };
+
+  try {
   const modelContext = buildModelContext(details, {
     includeFaces: false,
     maxFaceCountPerPart: 80,
@@ -1060,7 +1288,6 @@ async function runVlmAgentAnalysis(payload = {}) {
     topK: 24,
     facePairLimit: 6,
   });
-  const selection = payload?.selection || {};
   const contextSummary = summarizeModelContextForVlm(modelContext);
   const candidateSummary = summarizeCandidatesForVlm(candidates);
   const processLog = [];
@@ -1079,9 +1306,26 @@ async function runVlmAgentAnalysis(payload = {}) {
     });
   };
 
+  await appendConversationLog("session_context", {
+    focusPartIds: Array.isArray(payload?.focusPartIds) ? payload.focusPartIds : [],
+    focusFaceIds: Array.isArray(payload?.focusFaceIds) ? payload.focusFaceIds : [],
+    baseFaceIds: Array.isArray(payload?.baseFaceIds) ? payload.baseFaceIds : [],
+    assemblingFaceIds: Array.isArray(payload?.assemblingFaceIds) ? payload.assemblingFaceIds : [],
+    reasoningSnapshot: payload?.reasoningSnapshot || null,
+  });
+
   await ensureRendererWorkbench(projectId);
   const initialDisplayState = getRendererState();
   const initialObservation = await captureAgentObservation(projectId, "initial");
+  const initialPromptText = buildAgentToolInitialPrompt({
+    userInstruction,
+    conversationHistory,
+    contextSummary,
+    candidateSummary,
+    selection,
+    reasoningSnapshot: payload?.reasoningSnapshot || null,
+    currentDisplayState: summarizeRendererState(initialDisplayState),
+  });
 
   const messages = [
     { role: "system", content: VLM_AGENT_TOOL_LOOP_PROMPT },
@@ -1090,15 +1334,7 @@ async function runVlmAgentAnalysis(payload = {}) {
       content: [
         {
           type: "text",
-          text: buildAgentToolInitialPrompt({
-            userInstruction,
-            conversationHistory,
-            contextSummary,
-            candidateSummary,
-            selection,
-            reasoningSnapshot: payload?.reasoningSnapshot || null,
-            currentDisplayState: summarizeRendererState(initialDisplayState),
-          }),
+          text: initialPromptText,
         },
         ...initialObservation.images.map((image) => ({
           type: "image_url",
@@ -1118,6 +1354,16 @@ async function runVlmAgentAnalysis(payload = {}) {
     images: initialObservation.images.map((item) => item.label),
   });
   emitProgress({ startedAt: new Date().toISOString() });
+  await appendConversationLog("initial_observation", {
+    displayState: summarizeRendererState(initialDisplayState),
+    imageLabels: summarizeObservationImagesForLog(initialObservation.images),
+  });
+  await appendConversationLog("llm_input", {
+    round: 0,
+    phase: "initial",
+    text: initialPromptText,
+    imageLabels: summarizeObservationImagesForLog(initialObservation.images),
+  });
 
   let finalPayload = null;
 
@@ -1135,6 +1381,13 @@ async function runVlmAgentAnalysis(payload = {}) {
     messages.push({
       role: "assistant",
       content: completion.text,
+    });
+    await appendConversationLog("llm_output", {
+      round: stepIndex + 1,
+      text: completion.text,
+      parsed: completion.parsed || null,
+      decision,
+      usage: normalizeUsage(completion.raw?.usage || {}),
     });
 
     processLog.push({
@@ -1164,6 +1417,10 @@ async function runVlmAgentAnalysis(payload = {}) {
           detail: "系统要求在给出结论前至少先调用一次工具。",
         });
         emitProgress();
+        await appendConversationLog("final_blocked", {
+          round: stepIndex + 1,
+          reason: "系统要求至少先调用一次工具。",
+        });
         continue;
       }
 
@@ -1175,6 +1432,10 @@ async function runVlmAgentAnalysis(payload = {}) {
         detail: String(decision.final?.summary || "智能体完成了最终分析输出。"),
       });
       emitProgress({ status: "finalizing" });
+      await appendConversationLog("final_decision", {
+        round: stepIndex + 1,
+        final: finalPayload,
+      });
       break;
     }
 
@@ -1198,6 +1459,11 @@ async function runVlmAgentAnalysis(payload = {}) {
           },
         ],
       });
+      await appendConversationLog("tool_validation_error", {
+        round: stepIndex + 1,
+        message: error?.message || String(error),
+        rawToolCall: decision?.toolCall || null,
+      });
       continue;
     }
     processLog.push({
@@ -1207,10 +1473,17 @@ async function runVlmAgentAnalysis(payload = {}) {
       detail: JSON.stringify(toolCall.arguments),
     });
     emitProgress();
+    await appendConversationLog("tool_call", {
+      round: stepIndex + 1,
+      stageTitle: decision.stageTitle,
+      stageGoal: decision.stageGoal,
+      rationale: decision.rationale,
+      toolCall,
+    });
 
     let toolResult = null;
     try {
-      toolResult = await executeAgentDisplayTool(projectId, toolCall);
+      toolResult = await executeAgentTool(details, projectId, toolCall);
     } catch (error) {
       processLog.push({
         index: processLog.length + 1,
@@ -1228,29 +1501,43 @@ async function runVlmAgentAnalysis(payload = {}) {
           },
         ],
       });
+      await appendConversationLog("tool_execution_error", {
+        round: stepIndex + 1,
+        toolCall,
+        message: error?.message || String(error),
+      });
       continue;
     }
     toolCallCount += 1;
     const currentDisplayState = summarizeRendererState(toolResult?.rendererState || getRendererState());
     const observation =
-      toolCall.name === "capture_views"
+      toolResult.type === "capture_views"
         ? {
             captureResult: toolResult.captureResult,
-            images: extractCaptureImages(toolResult.captureResult, `capture_${stepIndex + 1}`),
+            images: extractCaptureImages(toolResult.captureResult, "capture_" + (stepIndex + 1)),
           }
-        : await captureAgentObservation(projectId, `step_${stepIndex + 1}`);
+        : toolResult.type === "analysis"
+          ? {
+              captureResult: null,
+              images: [],
+              textPayload: toolResult.payload,
+            }
+          : await captureAgentObservation(projectId, "step_" + (stepIndex + 1));
 
     processLog.push({
       index: processLog.length + 1,
       type: "tool_result",
       title: toolCall.name,
-      detail: `工具执行完成，返回 ${observation.images.length} 张观察图。`,
+      detail:
+        toolResult.type === "analysis"
+          ? (toolResult.summary || "Tool completed and returned structured data.")
+          : "Tool completed and returned " + observation.images.length + " observation images.",
       images: observation.images.map((item) => item.label),
     });
 
     toolStages.push({
-      stageId: `tool_stage_${stepIndex + 1}`,
-      title: decision.stageTitle || `阶段 ${stepIndex + 1}`,
+      stageId: "tool_stage_" + (stepIndex + 1),
+      title: decision.stageTitle || ("Stage " + (stepIndex + 1)),
       goal: decision.stageGoal || "",
       detail: decision.rationale || currentDisplayState.displayMode || "",
       toolName: toolCall.name,
@@ -1261,24 +1548,44 @@ async function runVlmAgentAnalysis(payload = {}) {
       observationLabels: observation.images.map((item) => item.label),
     });
     emitProgress();
+    await appendConversationLog("tool_result", {
+      round: stepIndex + 1,
+      toolName: toolCall.name,
+      result: summarizeToolResultForLog(toolResult, currentDisplayState, observation),
+      imageLabels: summarizeObservationImagesForLog(observation.images),
+    });
+
+    const followupPromptText = buildAgentToolFollowupPrompt({
+      userInstruction,
+      stepIndex: stepIndex + 1,
+      stageTitle: decision.stageTitle,
+      stageGoal: decision.stageGoal,
+      rationale: decision.rationale,
+      toolCall,
+      toolResult:
+        toolResult.type === "analysis"
+          ? {
+              analysis: toolResult.payload,
+              displayState: currentDisplayState,
+            }
+          : {
+              displayState: currentDisplayState,
+            },
+      currentDisplayState,
+    });
+    await appendConversationLog("llm_input", {
+      round: stepIndex + 1,
+      phase: "followup",
+      text: followupPromptText,
+      imageLabels: summarizeObservationImagesForLog(observation.images),
+    });
 
     messages.push({
       role: "user",
       content: [
         {
           type: "text",
-          text: buildAgentToolFollowupPrompt({
-            userInstruction,
-            stepIndex: stepIndex + 1,
-            stageTitle: decision.stageTitle,
-            stageGoal: decision.stageGoal,
-            rationale: decision.rationale,
-            toolCall,
-            toolResult: {
-              displayState: currentDisplayState,
-            },
-            currentDisplayState,
-          }),
+          text: followupPromptText,
         },
         ...observation.images.map((image) => ({
           type: "image_url",
@@ -1291,6 +1598,13 @@ async function runVlmAgentAnalysis(payload = {}) {
   }
 
   if (!finalPayload) {
+    const forcedFinalPrompt = "请立即结束分析，并返回 mode=final 的 JSON。";
+    await appendConversationLog("llm_input", {
+      round: MAX_VLM_AGENT_TOOL_STEPS + 1,
+      phase: "forced_final",
+      text: forcedFinalPrompt,
+      imageLabels: [],
+    });
     const completion = await callVlmJsonCompletion({
       apiKey: config.apiKey,
       baseUrl: config.baseUrl,
@@ -1303,7 +1617,7 @@ async function runVlmAgentAnalysis(payload = {}) {
           content: [
             {
               type: "text",
-              text: "请立即结束分析，并返回 mode=final 的 JSON。",
+              text: forcedFinalPrompt,
             },
           ],
         },
@@ -1311,6 +1625,13 @@ async function runVlmAgentAnalysis(payload = {}) {
     });
     usageSummary = mergeUsageSummary(usageSummary, completion.raw?.usage || {});
     const decision = normalizeAgentDecision(completion.parsed);
+    await appendConversationLog("llm_output", {
+      round: MAX_VLM_AGENT_TOOL_STEPS + 1,
+      text: completion.text,
+      parsed: completion.parsed || null,
+      decision,
+      usage: normalizeUsage(completion.raw?.usage || {}),
+    });
     finalPayload = decision.final;
     processLog.push({
       index: processLog.length + 1,
@@ -1319,53 +1640,85 @@ async function runVlmAgentAnalysis(payload = {}) {
       detail: "智能体完成了最终分析输出。",
     });
     emitProgress({ status: "finalizing" });
+    await appendConversationLog("final_decision", {
+      round: MAX_VLM_AGENT_TOOL_STEPS + 1,
+      final: finalPayload,
+    });
   }
 
   const normalized = normalizeVlmOutput(finalPayload);
+  const timeline = normalized.timeline.length ? normalized.timeline : toolStages;
+  const evidence = {
+    target: null,
+    imageCount:
+      initialObservation.images.length +
+      toolStages.reduce((sum, item) => sum + (item.observationLabels?.length || 0), 0),
+    imageLabels: [
+      ...initialObservation.images.map((item) => item.label),
+      ...toolStages.flatMap((item) => item.observationLabels || []),
+    ],
+    captureWarning: null,
+  };
+  const contextStats = {
+    partCount: details.manifest.partCount || 0,
+    faceCount: details.manifest.faceCount || 0,
+    relationCandidateCount: candidates.relationCandidates?.length || 0,
+    baseCandidateCount: candidates.baseCandidates?.length || 0,
+    subassemblyCandidateCount: candidates.subassemblyCandidates?.length || 0,
+    graspCandidateCount: candidates.graspCandidates?.length || 0,
+    toolCallCount,
+  };
   emitProgress({
     status: "ready",
     summary: normalized.summary,
-    timeline: normalized.timeline.length ? normalized.timeline : toolStages,
+    timeline,
     suggestions: normalized.suggestions,
+  });
+  await appendConversationLog("session_final", {
+    summary: normalized.summary,
+    confidence: normalized.confidence,
+    focus: normalized.focus,
+    timeline,
+    suggestions: normalized.suggestions,
+    usage: usageSummary,
+    evidence,
+    contextStats,
+    processLog,
+    toolStages,
   });
 
   return {
     projectId,
-    projectName: details.manifest.projectName,
+    projectName,
     model: config.model,
-    endpoint: `${config.baseUrl}/chat/completions`,
+    endpoint,
     generatedAt: new Date().toISOString(),
     instruction: userInstruction,
     summary: normalized.summary,
     confidence: normalized.confidence,
     focus: normalized.focus,
-    timeline: normalized.timeline.length ? normalized.timeline : toolStages,
+    timeline,
     suggestions: normalized.suggestions,
     usage: usageSummary,
-    evidence: {
-      target: null,
-      imageCount:
-        initialObservation.images.length +
-        toolStages.reduce((sum, item) => sum + (item.observationLabels?.length || 0), 0),
-      imageLabels: [
-        ...initialObservation.images.map((item) => item.label),
-        ...toolStages.flatMap((item) => item.observationLabels || []),
-      ],
-      captureWarning: null,
-    },
-    contextStats: {
-      partCount: details.manifest.partCount || 0,
-      faceCount: details.manifest.faceCount || 0,
-      relationCandidateCount: candidates.relationCandidates?.length || 0,
-      baseCandidateCount: candidates.baseCandidates?.length || 0,
-      subassemblyCandidateCount: candidates.subassemblyCandidates?.length || 0,
-      graspCandidateCount: candidates.graspCandidates?.length || 0,
-      toolCallCount,
-    },
+    evidence,
+    contextStats,
     processLog,
     toolStages,
     raw: finalPayload,
+    logSessionId: logger?.sessionId || null,
+    logFilePath: logger?.logFilePath || null,
   };
+  } catch (error) {
+    await appendConversationLog("session_error", {
+      message: error?.message || String(error),
+      stack: error?.stack || null,
+    });
+    throw error;
+  } finally {
+    if (logger) {
+      await logger.flush();
+    }
+  }
 }
 
 function registerIpcHandlers() {

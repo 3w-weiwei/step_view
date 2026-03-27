@@ -1,9 +1,10 @@
-﻿const { randomUUID } = require("crypto");
+const { randomUUID } = require("crypto");
 const { McpServer, ResourceTemplate } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { z } = require("zod/v4");
 const {
-  buildModelContext,
+  buildModelContextToolPayload,
   buildAnalysisCandidates,
+  buildRelationCandidatesToolPayload,
   buildEvidenceTarget,
   validateHypothesis,
 } = require("./analysis-v3");
@@ -201,8 +202,8 @@ function createMcpRuntime(adapter) {
 
   async function buildModelContextPayload(projectId, options = {}) {
     const details = await resolveProject(projectId);
-    const payload = buildModelContext(details, options);
-    if (options.includeColorMaps !== false) {
+    const payload = buildModelContextToolPayload(details, options);
+    if (options.includeColorMaps === true) {
       payload.colorMaps = await buildColorMaps(details.manifest.projectId);
     }
     return payload;
@@ -210,14 +211,7 @@ function createMcpRuntime(adapter) {
 
   async function buildRelationCandidatesPayload(projectId, options = {}) {
     const details = await resolveProject(projectId);
-    const candidates = buildAnalysisCandidates(details, options);
-    return {
-      projectId: details.manifest.projectId,
-      relationCandidates: candidates.relationCandidates,
-      baseCandidates: options.includeBaseCandidates === false ? [] : candidates.baseCandidates,
-      subassemblyCandidates: options.includeSubassemblyCandidates === false ? [] : candidates.subassemblyCandidates,
-      graspCandidates: options.includeGraspCandidates === false ? [] : candidates.graspCandidates,
-    };
+    return buildRelationCandidatesToolPayload(details, options);
   }
 
   async function captureEvidenceBundlePayload(projectId, options = {}) {
@@ -319,49 +313,75 @@ function createMcpRuntime(adapter) {
   });
 
   server.registerTool("assembly.get_model_context", {
-    description: "Return structured model context for VLM analysis.",
+    description: "Return lightweight or scoped model context for staged VLM retrieval.",
     inputSchema: {
       projectId: z.string().uuid().optional(),
+      partIds: z.array(z.string()).optional(),
       includeFaces: z.boolean().optional(),
       includeColorMaps: z.boolean().optional(),
       maxFaceCountPerPart: z.number().int().min(1).max(2048).optional(),
       maxDepth: z.number().int().min(1).max(64).optional(),
+      summaryOnly: z.boolean().optional(),
     },
-  }, async ({ projectId, includeFaces, includeColorMaps, maxFaceCountPerPart, maxDepth }) => {
+  }, async ({ projectId, partIds, includeFaces, includeColorMaps, maxFaceCountPerPart, maxDepth, summaryOnly }) => {
     const payload = await buildModelContextPayload(projectId, {
+      partIds,
       includeFaces,
       includeColorMaps,
       maxFaceCountPerPart,
       maxDepth,
+      summaryOnly,
     });
     return {
-      content: [{ type: "text", text: `Loaded model context for ${payload.projectName}.` }],
+      content: [{ type: "text", text: "Loaded " + payload.parts.length + " parts from " + payload.projectName + "." }],
       structuredContent: payload,
     };
   });
 
   server.registerTool("assembly.get_relation_candidates", {
-    description: "Return high-level relation, base, subassembly, and grasp candidates.",
+    description: "Return scoped relation candidates with optional evidence and candidate-type filtering.",
     inputSchema: {
       projectId: z.string().uuid().optional(),
       partIds: z.array(z.string()).optional(),
       topK: z.number().int().min(1).max(128).optional(),
       facePairLimit: z.number().int().min(1).max(12).optional(),
+      candidateTypes: z.array(z.string()).optional(),
+      includeEvidence: z.boolean().optional(),
+      evidenceLimit: z.number().int().min(1).max(32).optional(),
       includeBaseCandidates: z.boolean().optional(),
       includeSubassemblyCandidates: z.boolean().optional(),
       includeGraspCandidates: z.boolean().optional(),
     },
-  }, async ({ projectId, partIds, topK, facePairLimit, includeBaseCandidates, includeSubassemblyCandidates, includeGraspCandidates }) => {
+  }, async ({
+    projectId,
+    partIds,
+    topK,
+    facePairLimit,
+    candidateTypes,
+    includeEvidence,
+    evidenceLimit,
+    includeBaseCandidates,
+    includeSubassemblyCandidates,
+    includeGraspCandidates,
+  }) => {
     const payload = await buildRelationCandidatesPayload(projectId, {
       partIds,
       topK,
       facePairLimit,
+      candidateTypes,
+      includeEvidence,
+      evidenceLimit,
       includeBaseCandidates,
       includeSubassemblyCandidates,
       includeGraspCandidates,
     });
+    const totalCount =
+      (payload.relationCandidates?.length || 0) +
+      (payload.baseCandidates?.length || 0) +
+      (payload.subassemblyCandidates?.length || 0) +
+      (payload.graspCandidates?.length || 0);
     return {
-      content: [{ type: "text", text: `Returned ${payload.relationCandidates.length} relation candidates.` }],
+      content: [{ type: "text", text: "Returned " + totalCount + " scoped candidates." }],
       structuredContent: payload,
     };
   });
