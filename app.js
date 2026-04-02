@@ -2616,42 +2616,47 @@ function renderReasoningStatusNotice() {
 function renderReasoningAgentPanel() {
   const reasoning = state.workbench.reasoning;
   const agent = reasoning.data.agentAnalysis;
-  const selectedStep =
-    agent.selectedTimelineIndex >= 0 ? agent.timeline?.[agent.selectedTimelineIndex] || null : null;
   const isRunning = agent.status === "running";
   const processLog = Array.isArray(agent.processLog) ? agent.processLog : [];
   const toolStages = Array.isArray(agent.toolStages) ? agent.toolStages : [];
   const chatMessages = Array.isArray(agent.chatMessages) ? agent.chatMessages : [];
 
+  const latestUserMessage = [...chatMessages].reverse().find((item) => item.role === "user");
+  const latestAssistantMessage = [...chatMessages].reverse().find((item) => item.role === "assistant");
+
+  const simplifyAgentText = (text) => {
+    const rawText = String(text || "").trim();
+    if (!rawText) {
+      return "";
+    }
+
+    try {
+      const parsed = JSON.parse(rawText);
+      return parsed?.final?.summary || parsed?.summary || parsed?.stage_goal || parsed?.rationale || rawText;
+    } catch {
+      return rawText;
+    }
+  };
+
+  const assistantPreview = simplifyAgentText(latestAssistantMessage?.content || "");
+
   return `
     <div class="panel-card">
       <div class="panel-actions">
-        <h4>任务对话</h4>
+        <h4>任务输入</h4>
         <button class="secondary-button" data-action="send-agent-chat" ${isRunning ? "disabled" : ""}>
           ${isRunning ? "执行中..." : "发送指令"}
         </button>
       </div>
-      <p>在这里直接输入你的任务指令，模型会根据指令调用显示控制和截图工具完成任务。</p>
-      <div class="agent-chat-list" style="margin-top: 12px;">
-        ${
-          chatMessages.length
-            ? chatMessages
-                .map(
-                  (item) => `
-                    <div class="agent-chat-item ${item.role === "assistant" ? "is-assistant" : "is-user"}">
-                      <strong>${item.role === "assistant" ? "模型" : "你"}</strong>
-                      <span>${escapeHtml(item.content)}</span>
-                    </div>
-                  `,
-                )
-                .join("")
-            : `<div class="inline-note">还没有对话记录。输入一条任务指令后，模型会开始执行。</div>`
-        }
-      </div>
+      ${
+        latestUserMessage?.content
+          ? `<div class="inline-note reasoning-note" style="margin-top: 10px;">最近指令：${escapeHtml(latestUserMessage.content)}</div>`
+          : `<div class="inline-note reasoning-note" style="margin-top: 10px;">请输入装配分析任务，工具调用和输出会在下方逐步更新。</div>`
+      }
       <textarea
         class="agent-chat-input"
         rows="4"
-        placeholder="例如：请使用显示控制和截图工具分析这个装配体，找出最可能的基准件，并说明为什么。"
+        placeholder="例如：先定位基准件，再逐步调用工具确认关键配合关系，并输出简洁结论。"
         data-bind="agent-chat-input"
       >${escapeHtml(agent.chatInput || "")}</textarea>
       <div class="overview-grid agent-meta-grid" style="margin-top: 12px;">
@@ -2659,44 +2664,16 @@ function renderReasoningAgentPanel() {
         <div class="overview-row"><span>模型</span><strong>${escapeHtml(agent.model || "-")}</strong></div>
         <div class="overview-row"><span>置信度</span><strong>${formatConfidence(agent.confidence || 0)}</strong></div>
         <div class="overview-row"><span>完成时间</span><strong>${escapeHtml(formatDateTime(agent.finishedAt) || "-")}</strong></div>
-        <div class="overview-row"><span>显示模式</span><strong>${escapeHtml(getDisplayModeLabel(state.workbench.displayMode))}</strong></div>
       </div>
       ${
         agent.status === "error"
           ? `<div class="inline-note reasoning-note is-error" style="margin-top: 10px;">${escapeHtml(agent.error || "VLM 调用失败")}</div>`
           : ""
       }
-      ${
-        agent.summary
-          ? `<div class="inline-note reasoning-note" style="margin-top: 10px;">${escapeHtml(agent.summary)}</div>`
-          : `<div class="inline-note reasoning-note" style="margin-top: 10px;">发送任务后，这里会显示模型的阶段性结论。</div>`
-      }
-      <div class="inline-note reasoning-note" style="margin-top: 10px;">
-        智能体会结合“显示控制”里的工具以及多视角截图工具，逐步分析装配体。
-      </div>
     </div>
+
     <div class="panel-card">
-      <h4>工具调用过程</h4>
-      <div class="reasoning-list">
-        ${
-          processLog.length
-            ? processLog
-                .map(
-                  (item, index) => `
-                    <div class="reasoning-item is-static">
-                      <strong>${index + 1}. ${escapeHtml(item.title || item.type || "过程事件")}</strong>
-                      <span>${escapeHtml(item.detail || "-")}</span>
-                      ${item.images?.length ? `<span>截图：${escapeHtml(item.images.join(" / "))}</span>` : ""}
-                    </div>
-                  `,
-                )
-                .join("")
-            : `<div class="inline-note">运行后会在这里显示智能体调用显示控制工具的全过程。</div>`
-        }
-      </div>
-    </div>
-    <div class="panel-card">
-      <h4>工具阶段</h4>
+      <h4>工具调用（逐步）</h4>
       <div class="reasoning-list">
         ${
           toolStages.length
@@ -2704,52 +2681,38 @@ function renderReasoningAgentPanel() {
                 .map(
                   (item, index) => `
                     <div class="reasoning-item is-static">
-                      <strong>${index + 1}. ${escapeHtml(item.title || `阶段 ${index + 1}`)} / ${escapeHtml(item.toolName || "-")}</strong>
+                      <strong>${index + 1}. ${escapeHtml(item.toolName || item.title || `步骤 ${index + 1}`)}</strong>
                       <span>${escapeHtml(item.goal || item.detail || "-")}</span>
-                      ${item.observationLabels?.length ? `<span>观察：${escapeHtml(item.observationLabels.join(" / "))}</span>` : ""}
                     </div>
                   `,
                 )
                 .join("")
-            : `<div class="inline-note">运行后会在这里显示每个阶段使用的工具与目的。</div>`
+            : `<div class="inline-note">等待智能体开始调用工具...</div>`
         }
       </div>
     </div>
+
     <div class="panel-card">
-      <h4>分析时间线</h4>
-      <div class="reasoning-list agent-timeline">
+      <h4>输出内容（逐步）</h4>
+      <div class="reasoning-list">
         ${
-          agent.timeline?.length
-            ? agent.timeline
-                .map((item, index) => {
-                  const isActive = index === agent.selectedTimelineIndex;
-                  const partNames = item.focusPartIds?.length
-                    ? item.focusPartIds.map((partId) => getPartDisplayName(partId)).join(" / ")
-                    : "-";
-                  return `
-                    <button class="reasoning-item agent-step ${isActive ? "is-active" : ""}" data-action="select-agent-step" data-agent-step-index="${index}">
-                      <strong>${index + 1}. ${escapeHtml(item.title || "分析阶段")}</strong>
-                      <span>${escapeHtml(item.detail || "无详细说明。")}</span>
-                      <span class="agent-step-meta">焦点零件：${escapeHtml(partNames)}</span>
-                    </button>
-                  `;
-                })
+          processLog.length
+            ? processLog
+                .map(
+                  (item, index) => `
+                    <div class="reasoning-item is-static">
+                      <strong>${index + 1}. ${escapeHtml(item.title || item.type || "过程更新")}</strong>
+                      <span>${escapeHtml(item.detail || "-")}</span>
+                    </div>
+                  `,
+                )
                 .join("")
-            : `<div class="inline-note">运行后会在这里展示智能体的分析步骤。</div>`
+            : `<div class="inline-note">等待智能体输出阶段结果...</div>`
         }
-      </div>
-    </div>
-    <div class="panel-card">
-      <h4>联动摘要</h4>
-      <div class="overview-grid">
-        <div class="overview-row"><span>当前流程节点</span><strong>${selectedStep ? escapeHtml(selectedStep.title || `阶段 ${agent.selectedTimelineIndex + 1}`) : "未选择"}</strong></div>
-        <div class="overview-row"><span>当前基准件</span><strong>${escapeHtml(getPartDisplayName(selectedStep?.basePartId || reasoning.selection.basePartId))}</strong></div>
-        <div class="overview-row"><span>当前装配件</span><strong>${escapeHtml(getPartDisplayName(selectedStep?.assemblingPartId || reasoning.selection.assemblingPartId))}</strong></div>
-        <div class="overview-row"><span>证据图数量</span><strong>${agent.evidence?.imageCount ?? 0}</strong></div>
       </div>
       ${
-        agent.evidence?.captureWarning
-          ? `<div class="inline-note reasoning-note" style="margin-top: 10px;">证据抓取提示：${escapeHtml(agent.evidence.captureWarning)}</div>`
+        agent.summary || assistantPreview
+          ? `<div class="inline-note reasoning-note" style="margin-top: 12px;">最终结论：${escapeHtml(agent.summary || assistantPreview)}</div>`
           : ""
       }
       ${

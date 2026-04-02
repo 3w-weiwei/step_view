@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const { randomUUID } = require("crypto");
 const fs = require("fs/promises");
 const path = require("path");
@@ -54,91 +54,36 @@ const DEFAULT_VLM_TIMEOUT_MS = 240000;
 const DEFAULT_VLM_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 const DEFAULT_VLM_MODEL = "qwen3-vl-plus";
 const VLM_SYSTEM_PROMPT = [
-  "你是 CAD 装配分析智能体，需要结合结构化上下文与图像证据输出可执行结论。",
-  "必须仅输出 JSON，不要输出 Markdown 或额外说明。",
-  "输出结构：",
-  "{",
-  '  "summary": "字符串，简短总结",',
-  '  "confidence": 0 到 1 之间数字,',
-  '  "focus": {',
-  '    "basePartId": "字符串或null",',
-  '    "assemblingPartId": "字符串或null",',
-  '    "focusPartIds": ["字符串"],',
-  '    "baseFaceIds": ["字符串"],',
-  '    "assemblingFaceIds": ["字符串"],',
-  '    "insertionAxis": { "origin": {"x":0,"y":0,"z":0}, "direction": {"x":0,"y":0,"z":1}, "length": 数字 } 或 null',
-  "  },",
-  '  "timeline": [',
-  "    {",
-  '      "title": "阶段名称",',
-  '      "detail": "阶段解释",',
-  '      "basePartId": "字符串或null",',
-  '      "assemblingPartId": "字符串或null",',
-  '      "focusPartIds": ["字符串"],',
-  '      "baseFaceIds": ["字符串"],',
-  '      "assemblingFaceIds": ["字符串"],',
-  '      "focusFaceIds": ["字符串"],',
-  '      "insertionAxis": 同 focus.insertionAxis',
-  "    }",
-  "  ],",
-  '  "suggestions": ["下一步建议"]',
-  "}",
-  "约束：partId/faceId 必须来自输入上下文，不可杜撰。",
+  "你是一个用于 CAD 装配分析的 VLM 智能体。",
+  "你的核心目标是：基于模型上下文 + 图像证据，识别关键装配关系并给出可执行结论。",
+  "请只返回 JSON 对象，不要返回 Markdown。",
+  "不要求固定 JSON 模板，但建议包含：summary、confidence、focus、timeline、suggestions。",
+  "focus / timeline 中涉及的 partId 与 faceId 必须来自输入上下文，不可杜撰。",
+  "如果信息不足，请在结论中明确不确定点，并给出下一步建议。",
 ].join("\n");
 const VLM_AGENT_TOOL_LOOP_PROMPT = [
-  "你是一个 CAD 装配分析智能体。",
-  "你必须根据用户指令完成任务，可以先使用轻量上下文工具缩小范围，再使用显示控制工具观察装配体，最后输出分析结论。",
-  "每一轮必须只返回 JSON，不要输出 Markdown 或解释性文本。",
+  "你是一个 CAD 装配分析智能体，目标是借助 VLM + 工具调用完成模型分析。",
+  "重点不是拼凑固定 JSON 模板，而是高质量完成观察 -> 缩小范围 -> 验证关系 -> 输出结论。",
+  "每一轮只返回 JSON（禁止 Markdown / 解释性前后缀）。",
   "可用工具：",
-  '1. focus_parts: {"part_ids":["partId"]} 聚焦指定零件。',
-  '2. hide_parts: {"part_ids":["partId"]} 隐藏指定零件。',
-  '3. set_part_opacity: {"part_ids":["partId"],"opacity":0.05-1} 调整指定零件透明度。',
-  '4. set_face_map: {"part_ids":["partId"]} 仅对指定零件显示面映射。',
-  '5. move_parts: {"part_ids":["partId"],"direction":{"x":0,"y":0,"z":1},"distance":10} 沿指定方向移动零件。',
+  '1. focus_parts: {\"part_ids\":[\"partId\"]} 聚焦指定零件。',
+  '2. hide_parts: {\"part_ids\":[\"partId\"]} 隐藏指定零件。',
+  '3. set_part_opacity: {\"part_ids\":[\"partId\"],\"opacity\":0.05-1} 调整指定零件透明度。',
+  '4. set_face_map: {\"part_ids\":[\"partId\"]} 仅对指定零件显示面映射。',
+  '5. move_parts: {\"part_ids\":[\"partId\"],\"direction\":{\"x\":0,\"y\":0,\"z\":1},\"distance\":10} 沿指定方向移动零件。',
   '6. reset_display: {} 恢复默认显示状态。',
-  '7. reset_translation: {"part_ids":["partId"]} 或 {} 恢复零件默认位置。',
-  '8. capture_views: {"presets":["front","left","top","right","back","bottom","iso"],"mode":"beauty"|"face-mask"|"id-mask"} 获取截图。',
-  '9. get_model_context: {"part_ids":["partId"],"max_depth":3,"include_faces":false,"max_face_count_per_part":24,"summary_only":true} 获取全局或局部模型上下文，优先使用摘要模式。',
-  '10. get_relation_candidates: {"part_ids":["partId"],"top_k":8,"candidate_types":["relation","base","subassembly","grasp"],"include_evidence":false,"evidence_limit":4} 获取候选关系，先轻量召回，再在锁定 2 到 6 个零件后细取局部细节。',
-  "返回 JSON 结构：",
-  "{",
-  '  "mode": "tool" | "final",',
-  '  "stage_title": "阶段标题",',
-  '  "stage_goal": "阶段目标",',
-  '  "rationale": "为什么这样做",',
-  '  "tool_call": { "name": "工具名", "arguments": { ... } },',
-  '  "final": {',
-  '    "summary": "字符串",',
-  '    "confidence": 0.0,',
-  '    "focus": {',
-  '      "basePartId": "字符串或null",',
-  '      "assemblingPartId": "字符串或null",',
-  '      "focusPartIds": ["字符串"],',
-  '      "baseFaceIds": ["字符串"],',
-  '      "assemblingFaceIds": ["字符串"],',
-  '      "insertionAxis": { "origin": {"x":0,"y":0,"z":0}, "direction": {"x":0,"y":0,"z":1}, "length": 数字 } 或 null',
-  "    },",
-  '    "timeline": [',
-  "      {",
-  '        "title": "阶段名称",',
-  '        "detail": "阶段解释",',
-  '        "basePartId": "字符串或null",',
-  '        "assemblingPartId": "字符串或null",',
-  '        "focusPartIds": ["字符串"],',
-  '        "baseFaceIds": ["字符串"],',
-  '        "assemblingFaceIds": ["字符串"],',
-  '        "focusFaceIds": ["字符串"],',
-  '        "insertionAxis": 同 focus.insertionAxis',
-  "      }",
-  "    ],",
-  '    "suggestions": ["下一步建议"]',
-  "  }",
-  "}",
+  '7. reset_translation: {\"part_ids\":[\"partId\"]} 或 {} 恢复零件默认位置。',
+  '8. capture_views: {"presets":["front","left","top","right","back","bottom","iso"]?,"mode":"beauty"|"face-mask"|"id-mask","fit":false,"current_view":true} 获取截图（presets 可省略；current_view=true 时抓取当前视角）。',
+  '9. get_model_context: {\"part_ids\":[\"partId\"],\"max_depth\":3,\"include_faces\":false,\"max_face_count_per_part\":24,\"summary_only\":true} 获取模型上下文（优先摘要）。',
+  '10. get_relation_candidates: {\"part_ids\":[\"partId\"],\"top_k\":8,\"candidate_types\":[\"relation\",\"base\",\"subassembly\",\"grasp\"],\"include_evidence\":false,\"evidence_limit\":4} 获取候选关系。',
+  "输出格式（保持简洁，不要冗余字段）：",
+  "1) 工具轮：{ mode: tool, stage_title, stage_goal, rationale, tool_call: { name, arguments } }",
+  "2) 结束轮：{ mode: final, stage_title, stage_goal, rationale, final: { summary, confidence, focus, timeline, suggestions } }",
   "规则：",
-  "- 在至少调用一次工具前，不要直接返回 final。",
-  "- 每次 mode=tool 时只能调用一个工具。",
-  "- partId 和 faceId 必须来自已提供上下文。",
-  "- 优先先做摘要检索，再做局部细节检索。",
+  "- 至少调用一次工具后再输出 final。",
+  "- 每次 mode=tool 只能调用一个工具。",
+  "- partId / faceId 必须来自已给上下文，不可杜撰。",
+  "- 信息不足时，在 final 中明确不确定性并给出下一步建议。",
 ].join("\n");
 const MAX_VLM_AGENT_TOOL_STEPS = 30;
 
@@ -163,6 +108,33 @@ function formatJsonlTimestamp(value = new Date()) {
   return new Date(value).toISOString().replace(/[:.]/g, "-");
 }
 
+function sanitizeFileToken(value, fallback = "item") {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return normalized || fallback;
+}
+
+function parseDataUrlImage(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const mimeType = match[1];
+  const base64 = match[2];
+  const extension = mimeType === "image/jpeg" ? "jpg" : mimeType === "image/webp" ? "webp" : "png";
+
+  return {
+    mimeType,
+    base64,
+    extension,
+  };
+}
+
 async function createVlmConversationLogger({
   projectId,
   projectName,
@@ -173,12 +145,34 @@ async function createVlmConversationLogger({
   selection,
 }) {
   const sessionId = randomUUID();
+  const sessionTimestamp = formatJsonlTimestamp();
+  const sessionDirectoryName = `${sessionTimestamp}-${sessionId}`;
   const logDirectory = path.join(getProjectDirectory(projectId), "agent-chat-logs");
-  await fs.mkdir(logDirectory, { recursive: true });
+  const sessionDirectory = path.join(logDirectory, sessionDirectoryName);
+  const imagesDirectory = path.join(sessionDirectory, "images");
+  const tracesDirectory = path.join(sessionDirectory, "traces");
 
-  const logFilePath = path.join(logDirectory, `${formatJsonlTimestamp()}-${sessionId}.jsonl`);
+  await fs.mkdir(imagesDirectory, { recursive: true });
+  await fs.mkdir(tracesDirectory, { recursive: true });
+
+  const logFilePath = path.join(sessionDirectory, "events.jsonl");
+  const summaryFilePath = path.join(sessionDirectory, "summary.json");
+  const traceFilePath = path.join(tracesDirectory, "agent-loop-trace.json");
   let writeQueue = Promise.resolve();
   let writeFailed = false;
+  const savedImages = [];
+
+  function enqueueWrite(task) {
+    writeQueue = writeQueue
+      .then(() => task())
+      .catch((error) => {
+        if (!writeFailed) {
+          writeFailed = true;
+          console.error("Failed to write VLM conversation artifacts:", error);
+        }
+      });
+    return writeQueue;
+  }
 
   function append(eventType, payload = {}) {
     const entry = {
@@ -188,16 +182,62 @@ async function createVlmConversationLogger({
       ...payload,
     };
 
-    writeQueue = writeQueue
-      .then(() => fs.appendFile(logFilePath, `${JSON.stringify(entry)}\n`, "utf8"))
-      .catch((error) => {
-        if (!writeFailed) {
-          writeFailed = true;
-          console.error("Failed to append VLM conversation log:", error);
-        }
-      });
+    return enqueueWrite(() => fs.appendFile(logFilePath, JSON.stringify(entry) + "\n", "utf8"));
+  }
 
-    return writeQueue;
+  function writeJsonArtifact(relativePath, payload) {
+    const targetPath = path.join(sessionDirectory, relativePath);
+    return enqueueWrite(async () => {
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+      await fs.writeFile(targetPath, JSON.stringify(payload, null, 2), "utf8");
+    });
+  }
+
+  function saveImageDataUrl(dataUrl, options = {}) {
+    const parsed = parseDataUrlImage(dataUrl);
+    if (!parsed) {
+      return Promise.resolve(null);
+    }
+
+    const step = Number.isFinite(Number(options.step)) ? Number(options.step) : 0;
+    const kind = sanitizeFileToken(options.kind || "observation", "observation");
+    const label = sanitizeFileToken(options.label || "", "image");
+    const preset = sanitizeFileToken(options.preset || "", "view");
+    const fileName = `${String(step).padStart(2, "0")}-${kind}-${label}-${preset}.${parsed.extension}`;
+    const relativePath = path.join("images", fileName);
+    const absolutePath = path.join(sessionDirectory, relativePath);
+
+    return enqueueWrite(async () => {
+      await fs.writeFile(absolutePath, Buffer.from(parsed.base64, "base64"));
+      const imageMeta = {
+        step,
+        kind,
+        label: options.label || "",
+        preset: options.preset || null,
+        mimeType: parsed.mimeType,
+        path: relativePath.replace(/\\/g, "/"),
+      };
+      savedImages.push(imageMeta);
+      return imageMeta;
+    });
+  }
+
+  async function saveObservationImages(images = [], options = {}) {
+    const list = Array.isArray(images) ? images : [];
+    const results = [];
+    for (let index = 0; index < list.length; index += 1) {
+      const image = list[index] || {};
+      const meta = await saveImageDataUrl(image.dataUrl, {
+        step: options.step,
+        kind: options.kind || "observation",
+        label: image.label || `${options.kind || "observation"}-${index + 1}`,
+        preset: image.preset || null,
+      });
+      if (meta) {
+        results.push(meta);
+      }
+    }
+    return results;
   }
 
   await append("session_start", {
@@ -212,8 +252,16 @@ async function createVlmConversationLogger({
 
   return {
     sessionId,
+    sessionDirectory,
     logFilePath,
+    summaryFilePath,
+    traceFilePath,
     append,
+    writeJsonArtifact,
+    saveObservationImages,
+    getSavedImages() {
+      return [...savedImages];
+    },
     flush() {
       return writeQueue;
     },
@@ -617,11 +665,14 @@ function sanitizeToolPartIds(details, partIds = []) {
   return unique(partIds).filter((partId) => validPartIds.has(partId));
 }
 
-function sanitizeCapturePresets(presets = []) {
+function sanitizeCapturePresets(presets = [], options = {}) {
   const allowed = new Set(["front", "left", "top", "right", "back", "bottom", "iso"]);
   const normalized = unique((Array.isArray(presets) ? presets : [presets]).map((item) => String(item || "").toLowerCase()))
     .filter((item) => allowed.has(item));
-  return normalized.length ? normalized.slice(0, 4) : ["iso"];
+  if (normalized.length) {
+    return normalized.slice(0, 4);
+  }
+  return options.allowEmpty ? [] : ["iso"];
 }
 
 function sanitizeAgentBoolean(value, fallback = false) {
@@ -717,10 +768,13 @@ function sanitizeAgentToolCall(details, decision) {
       return {
         name: toolName,
         arguments: {
-          presets: sanitizeCapturePresets(rawArgs.presets || rawArgs.views || []),
+          presets: sanitizeCapturePresets(rawArgs.presets || rawArgs.views || [], {
+            allowEmpty: sanitizeAgentBoolean(rawArgs.current_view ?? rawArgs.currentView, false),
+          }),
           mode: ["beauty", "face-mask", "id-mask"].includes(String(rawArgs.mode || "").toLowerCase())
             ? String(rawArgs.mode).toLowerCase()
             : "beauty",
+          fit: sanitizeAgentBoolean(rawArgs.fit, false),
         },
       };
     case "focus_parts":
@@ -963,7 +1017,7 @@ async function executeAgentTool(details, projectId, toolCall) {
         presets: toolCall.arguments.presets,
         width: 960,
         height: 720,
-        fit: true,
+        fit: toolCall.arguments.fit,
       });
       return {
         type: "capture_views",

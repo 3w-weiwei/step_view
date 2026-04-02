@@ -1,4 +1,4 @@
-﻿const {
+const {
   buildBasePartCandidates,
   buildMatingCandidates,
   buildInsertionCandidates,
@@ -527,50 +527,34 @@ function normalizeCandidateTypes(candidateTypes = []) {
     .map((item) => aliases[String(item || "").trim().toLowerCase()] || null)
     .filter(Boolean));
 
-  return normalized.length ? normalized : ["relation", "base", "subassembly", "grasp"];
+  return normalized.length ? normalized : ["relation", "base"];
 }
 
-function formatModelContextPartForTool(part, includeFaces) {
-  const payload = {
+function formatModelContextPartForTool(part) {
+  return {
     partId: part.partId,
     name: part.name,
-    pathNames: part.pathNames,
-    bbox: part.bbox,
     tags: part.tags,
-    faceCount: part.faceCount,
-    facesTruncated: part.facesTruncated,
   };
-
-  if (includeFaces) {
-    payload.faces = part.faces;
-  }
-
-  return payload;
 }
 
 function buildModelContextToolPayload(details, options = {}) {
-  const summaryOnly = options.summaryOnly == null ? options.includeFaces !== true : Boolean(options.summaryOnly);
-  const includeFaces = !summaryOnly && options.includeFaces === true;
-  const maxDepth = toBoundedInteger(options.maxDepth, summaryOnly ? 3 : 5, 1, 12);
-  const maxFaceCountPerPart = toBoundedInteger(options.maxFaceCountPerPart, 24, 1, 256);
+  const maxDepth = toBoundedInteger(options.maxDepth, 3, 1, 12);
   const payload = buildModelContext(details, {
     partIds: options.partIds,
     maxDepth,
-    includeFaces,
-    maxFaceCountPerPart,
-    summaryOnly,
+    includeFaces: false,
+    maxFaceCountPerPart: 1,
+    summaryOnly: true,
   });
 
   return {
     projectId: payload.projectId,
-    projectName: payload.projectName,
-    modelName: payload.modelName,
-    parserMode: payload.parserMode,
-    geometryMode: payload.geometryMode,
-    scope: payload.scope,
-    assembly: payload.assembly,
-    tree: payload.tree,
-    parts: payload.parts.map((part) => formatModelContextPartForTool(part, includeFaces)),
+    scope: {
+      partIds: payload.scope.partIds,
+      isPartial: payload.scope.isPartial,
+    },
+    parts: payload.parts.map((part) => formatModelContextPartForTool(part)),
   };
 }
 
@@ -578,35 +562,21 @@ function limitEvidenceEntries(values, limit) {
   return Array.isArray(values) ? values.slice(0, limit) : [];
 }
 
-function formatRelationCandidateForTool(candidate, includeEvidence, evidenceLimit) {
+function formatRelationCandidateForTool(candidate) {
   return {
     candidateId: candidate.candidateId,
-    order: candidate.order,
     partAId: candidate.partAId,
-    partAName: candidate.partAName,
     partBId: candidate.partBId,
-    partBName: candidate.partBName,
-    featureGroupA: candidate.featureGroupA,
-    featureGroupB: candidate.featureGroupB,
     relationType: candidate.relationType,
-    sharedAxis: candidate.sharedAxis,
-    bboxGap: candidate.bboxGap,
     score: candidate.score,
-    ruleEvidence: includeEvidence ? limitEvidenceEntries(candidate.ruleEvidence, evidenceLimit) : [],
-    facePairs: includeEvidence ? limitEvidenceEntries(candidate.facePairs, evidenceLimit) : [],
   };
 }
 
 function formatBaseCandidateForTool(candidate, includeEvidence, evidenceLimit) {
   return {
     partId: candidate.partId,
-    name: candidate.name,
     score: candidate.score,
-    volumeScore: candidate.volumeScore,
-    supportAreaScore: candidate.supportAreaScore,
-    connectivityScore: candidate.connectivityScore,
-    centerBias: candidate.centerBias,
-    reasons: includeEvidence ? limitEvidenceEntries(candidate.reasons, evidenceLimit) : [],
+    reasons: includeEvidence ? limitEvidenceEntries(candidate.reasons, Math.min(2, evidenceLimit)) : [],
   };
 }
 
@@ -638,15 +608,13 @@ function formatGraspCandidateForTool(candidate, includeEvidence, evidenceLimit) 
 function buildRelationCandidatesToolPayload(details, options = {}) {
   const partMap = buildPartMap(details);
   const scopedPartIds = sanitizeScopedPartIds(partMap, options.partIds);
-  const topK = toBoundedInteger(options.topK, 12, 1, 64);
+  const topK = toBoundedInteger(options.topK, 8, 1, 64);
   const candidateTypes = normalizeCandidateTypes(
     options.candidateTypes?.length
       ? options.candidateTypes
       : [
           "relation",
           options.includeBaseCandidates === false ? null : "base",
-          options.includeSubassemblyCandidates === false ? null : "subassembly",
-          options.includeGraspCandidates === false ? null : "grasp",
         ],
   );
   const includeEvidence = Boolean(options.includeEvidence);
@@ -658,28 +626,19 @@ function buildRelationCandidatesToolPayload(details, options = {}) {
   });
 
   return {
-    projectId: details.manifest.projectId,
-    projectName: details.manifest.projectName,
     scope: {
       partIds: scopedPartIds,
-      isPartial: scopedPartIds.length > 0,
       candidateTypes,
       topK,
-      includeEvidence,
-      evidenceLimit,
     },
     relationCandidates: candidateTypes.includes("relation")
-      ? payload.relationCandidates.slice(0, topK).map((candidate) => formatRelationCandidateForTool(candidate, includeEvidence, evidenceLimit))
+      ? payload.relationCandidates.slice(0, topK).map((candidate) => formatRelationCandidateForTool(candidate))
       : [],
     baseCandidates: candidateTypes.includes("base")
       ? payload.baseCandidates.slice(0, Math.min(topK, 8)).map((candidate) => formatBaseCandidateForTool(candidate, includeEvidence, evidenceLimit))
       : [],
-    subassemblyCandidates: candidateTypes.includes("subassembly")
-      ? payload.subassemblyCandidates.slice(0, Math.min(topK, 8)).map((candidate) => formatSubassemblyCandidateForTool(candidate, includeEvidence, evidenceLimit))
-      : [],
-    graspCandidates: candidateTypes.includes("grasp")
-      ? payload.graspCandidates.slice(0, Math.min(topK, 12)).map((candidate) => formatGraspCandidateForTool(candidate, includeEvidence, evidenceLimit))
-      : [],
+    subassemblyCandidates: [],
+    graspCandidates: [],
   };
 }
 

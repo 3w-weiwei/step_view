@@ -3,3 +3,4 @@ project-data/
 dist/
 *.log
 /test/output
+/mcp-test-output
