@@ -117,7 +117,8 @@ async function handleTcpMessage(clientSocket, message) {
       "getState", "loadProject", "listProjects", "importStep",
       "getParts", "selectParts", "clearSelection", "getSelectedParts",
       "setColorMode", "setCamera", "getCamera", "setViewPreset", "fit",
-      "captureScreenshot", "captureMultiview", "setSection", "getColorMapping"
+      "captureScreenshot", "captureMultiview", "setSection", "getColorMapping",
+      "setTransparency", "highlightFaces", "setExplodedView"
     ];
     clientSocket.write(JSON.stringify({ type: "methods", id, result: methods }) + "\n");
   }

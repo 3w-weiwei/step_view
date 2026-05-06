@@ -2538,6 +2538,37 @@ async function handleViewerInvoke({ id, method, params }) {
         }
         result = { success: true, mode: params?.mode };
         break;
+      case "setTransparency": {
+        if (state.viewer) {
+          state.viewer.setTransparency({
+            partIds: params?.partIds || params?.part_ids || [],
+            level: params?.level ?? 0,
+            mode: params?.mode || "set",
+            levels: params?.levels || null,
+          });
+        }
+        result = { success: true };
+        break;
+      }
+      case "highlightFaces": {
+        if (state.viewer) {
+          state.viewer.setFaceHighlights({
+            faceIds: params?.faceIds || params?.face_ids || [],
+            color: params?.color || "#f0b13f",
+            clearExisting: Boolean(params?.clearExisting || params?.clear_existing),
+            highlights: params?.highlights || null,
+          });
+        }
+        result = { success: true };
+        break;
+      }
+      case "setExplodedView": {
+        if (state.viewer) {
+          state.viewer.setExplodedView(params?.explodedView || params?.exploded_view || params || null);
+        }
+        result = { success: true };
+        break;
+      }
       case "setCamera": {
         if (state.viewer && params) {
           state.viewer.setCameraBySpherical(

@@ -5,13 +5,16 @@
   "description": "STEP 装配模型可视化桌面软件首版 MVP",
   "main": "main.js",
   "scripts": {
-    "start": "set ELECTRON_RUN_AS_NODE=&& electron ."
+    "start": "set ELECTRON_RUN_AS_NODE=&& electron .",
+    "mcp": "node mcp-server.js"
   },
   "devDependencies": {
     "electron": "30"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "occt-import-js": "^0.0.23",
-    "three": "^0.183.2"
+    "three": "^0.183.2",
+    "zod": "^4.4.3"
   }
 }

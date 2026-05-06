@@ -87,6 +87,40 @@ function createMaterial(color) {
   });
 }
 
+function normalizeMap(value) {
+  if (!value) {
+    return new Map();
+  }
+  if (value instanceof Map) {
+    return new Map(value);
+  }
+  if (Array.isArray(value)) {
+    return new Map(value);
+  }
+  return new Map(Object.entries(value));
+}
+
+function normalizeNumberMap(value) {
+  const result = new Map();
+  normalizeMap(value).forEach((entryValue, key) => {
+    const numericValue = Number(entryValue);
+    if (Number.isFinite(numericValue)) {
+      result.set(key, Math.max(0, Math.min(1, numericValue)));
+    }
+  });
+  return result;
+}
+
+function normalizeDirection(value) {
+  const vector = Array.isArray(value)
+    ? new THREE.Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0)
+    : new THREE.Vector3(Number(value?.x) || 0, Number(value?.y) || 0, Number(value?.z) || 0);
+  if (vector.lengthSq() < 1e-9) {
+    vector.set(1, 0, 0);
+  }
+  return vector.normalize();
+}
+
 export class WorkbenchViewer {
   constructor({ canvas, onObjectPick, onHintChange }) {
     this.canvas = canvas;
@@ -109,6 +143,10 @@ export class WorkbenchViewer {
         axis: "x",
         offset: 0,
       },
+      transparencyLevels: new Map(),
+      fadeOthers: null,
+      highlightedFaces: new Map(),
+      explodedView: null,
     };
 
     this.renderer = new THREE.WebGLRenderer({
@@ -588,6 +626,101 @@ export class WorkbenchViewer {
     this.render();
   }
 
+  setTransparency({ partIds = [], level = 0, mode = "set", levels = null } = {}) {
+    if (mode === "clear") {
+      this.state.transparencyLevels = new Map();
+      this.state.fadeOthers = null;
+    } else if (mode === "fade_others") {
+      this.state.fadeOthers = {
+        partIds: new Set(partIds),
+        level: Math.max(0, Math.min(1, Number(level) || 0)),
+      };
+    } else {
+      const nextLevels = levels ? normalizeNumberMap(levels) : new Map(this.state.transparencyLevels);
+      partIds.forEach((partId) => {
+        nextLevels.set(partId, Math.max(0, Math.min(1, Number(level) || 0)));
+      });
+      this.state.transparencyLevels = nextLevels;
+      this.state.fadeOthers = null;
+    }
+    this.applyVisualState();
+  }
+
+  setFaceHighlights({ highlights = null, faceIds = [], color = "#f0b13f", clearExisting = false } = {}) {
+    const nextHighlights = clearExisting ? new Map() : new Map(this.state.highlightedFaces);
+    normalizeMap(highlights).forEach((highlightColor, faceId) => {
+      nextHighlights.set(faceId, highlightColor || color);
+    });
+    faceIds.forEach((faceId) => {
+      nextHighlights.set(faceId, color);
+    });
+    this.state.highlightedFaces = nextHighlights;
+    this.applyVisualState();
+  }
+
+  setExplodedView(explodedView) {
+    if (!explodedView || Number(explodedView.factor) <= 0) {
+      this.state.explodedView = null;
+    } else {
+      this.state.explodedView = {
+        direction: normalizeDirection(explodedView.direction).toArray(),
+        factor: Number(explodedView.factor) || 0,
+        scope: explodedView.scope || "assembly",
+        anchorPartId: explodedView.anchor_part_id || explodedView.anchorPartId || null,
+        mode: explodedView.mode || "linear",
+      };
+    }
+    this.applyExplodedView();
+    this.render();
+  }
+
+  applyExplodedView() {
+    const explodedView = this.state.explodedView;
+    const bounds = this.sceneData?.bounds;
+    const modelCenter = bounds
+      ? new THREE.Vector3(bounds.center.x, bounds.center.y, bounds.center.z)
+      : new THREE.Vector3();
+    const modelSize = bounds
+      ? new THREE.Vector3(bounds.size.x, bounds.size.y, bounds.size.z)
+      : new THREE.Vector3(100, 100, 100);
+    const baseDistance = Math.max(modelSize.length() * 0.22, 20);
+    const direction = normalizeDirection(explodedView?.direction);
+    const anchorPartId = explodedView?.anchorPartId || null;
+    const anchorNode = anchorPartId ? this.nodeMap.get(anchorPartId) : null;
+    const anchorCenter = anchorNode?.bbox?.center
+      ? new THREE.Vector3(anchorNode.bbox.center.x, anchorNode.bbox.center.y, anchorNode.bbox.center.z)
+      : modelCenter;
+
+    this.meshRecords.forEach((record) => {
+      const node = record.node;
+      const offset = new THREE.Vector3();
+      if (explodedView && node?.bbox) {
+        const nodeCenter = new THREE.Vector3(node.bbox.center.x, node.bbox.center.y, node.bbox.center.z);
+        const factor = Number(explodedView.factor) || 0;
+        if (explodedView.mode === "radial") {
+          offset.copy(nodeCenter).sub(anchorPartId ? anchorCenter : modelCenter);
+          if (offset.lengthSq() < 1e-9) {
+            offset.copy(direction);
+          }
+          offset.normalize().multiplyScalar(baseDistance * factor);
+        } else if (explodedView.mode === "hierarchy") {
+          const depth = Math.max(1, Number(node.depth || node.pathNames?.length || 1));
+          offset.copy(direction).multiplyScalar(baseDistance * factor * depth * 0.35);
+        } else {
+          const projected = nodeCenter.clone().sub(anchorPartId ? anchorCenter : modelCenter).dot(direction);
+          const signedScale = projected >= 0 ? 1 : -1;
+          const distance = baseDistance * factor * (0.35 + Math.min(1.5, Math.abs(projected) / Math.max(modelSize.length() * 0.5, 1)));
+          offset.copy(direction).multiplyScalar(distance * signedScale);
+        }
+      }
+
+      record.mesh.position.copy(offset);
+      if (record.edges) {
+        record.edges.position.copy(offset);
+      }
+    });
+  }
+
   setSelection(selection) {
     this.selection = selection;
     this.applyVisualState();
@@ -601,16 +734,26 @@ export class WorkbenchViewer {
       record.mesh.visible = visibleByHidden && visibleByIsolation;
       // 剖切启用时隐藏线框，避免被剖切面上的边缘线干扰视觉
       record.edges.visible = record.mesh.visible && !this.state.section.enabled;
+      record.edges.position.copy(record.mesh.position);
 
       const materials = Array.isArray(record.mesh.material) ? record.mesh.material : [record.mesh.material];
+      let opacity = 1;
+      if (this.state.fadeOthers) {
+        opacity = this.state.fadeOthers.partIds.has(record.meshData.nodeId)
+          ? 1
+          : 1 - this.state.fadeOthers.level;
+      } else if (this.state.transparencyLevels.has(record.meshData.nodeId)) {
+        opacity = 1 - this.state.transparencyLevels.get(record.meshData.nodeId);
+      }
       materials.forEach((material, index) => {
         // 只在 face 模式下恢复到 baseColors，part 模式保持当前材质颜色
         if (this.state.colorMode !== "part") {
           material.color.copy(record.baseColors[index] || record.baseColors[0]);
         }
         material.emissive = new THREE.Color(0x000000);
-        material.opacity = 1;
-        material.transparent = false;
+        material.opacity = opacity;
+        material.transparent = opacity < 0.999;
+        material.depthWrite = opacity >= 0.999;
         material.clippingPlanes = this.state.section.enabled ? [this.sectionPlane] : [];
         material.clipShadows = true;
       });
@@ -635,6 +778,12 @@ export class WorkbenchViewer {
         if (!material) {
           return;
         }
+        const highlightColor = this.state.highlightedFaces.get(face.id);
+        if (highlightColor) {
+          material.color.set(highlightColor);
+          material.emissive = new THREE.Color(highlightColor);
+          material.emissiveIntensity = 0.22;
+        }
         if (selectedFaceId === face.id) {
           material.color.set(0xf0b13f);
           material.emissive = new THREE.Color(0x7f5300);
@@ -647,6 +796,7 @@ export class WorkbenchViewer {
       });
     });
 
+    this.applyExplodedView();
     this.render();
   }
 
