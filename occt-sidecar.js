@@ -20,6 +20,32 @@ function pickColor(seed) {
   return PALETTE[hash % PALETTE.length];
 }
 
+// VLM优化的面颜色调色板 - 高饱和度、高亮度、高对比度
+const FACE_PALETTE = [
+  // 基础彩虹色 - 高饱和度
+  "#FF4444", "#FF8C00", "#FFD700", "#7FFF00", "#00FF7F", "#00FFFF", "#007FFF", "#4444FF", "#8B00FF", "#FF00FF",
+  // 额外的鲜艳色彩
+  "#FF6B6B", "#FFA502", "#FFFA65", "#A8E063", "#26DE81", "#2BCFE7", "#4B7BEC", "#845EC2", "#D65DB1", "#FF6F91",
+  // 金属感强的高对比色
+  "#E74C3C", "#F39C12", "#F1C40F", "#2ECC71", "#1ABC9C", "#3498DB", "#9B59B6", "#E91E63", "#00BCD4", "#CDDC39",
+  // 更多高饱和度颜色
+  "#FF1744", "#FF9100", "#FFEA00", "#00E676", "#00B0FF", "#651FFF", "#D500F9", "#FF4081", "#18FFFF", "#C6FF00",
+  "#F50057", "#FF3D00", "#FFD600", "#1DE9B6", "#2979FF", "#6200EA", "#AA00FF", "#FF80AB", "#84FFFF", "#EEFF41",
+];
+
+function getFaceColor(faceIndex, totalFaces) {
+  // 使用高对比度的颜色分布策略
+  if (totalFaces <= FACE_PALETTE.length) {
+    // 面数较少时，直接使用调色板中的颜色
+    return FACE_PALETTE[faceIndex % FACE_PALETTE.length];
+  }
+  // 面数较多时，使用HSL生成高饱和度高亮度的颜色
+  const hue = (faceIndex * 137.508) % 360; // 黄金角分布，确保颜色均匀分布
+  const saturation = 85 + (faceIndex % 15); // 85-100%饱和度
+  const lightness = 50 + (faceIndex % 15);  // 50-65%亮度
+  return `hsl(${Math.round(hue)}, ${saturation}%, ${lightness}%)`;
+}
+
 function rgbArrayToHex(color) {
   if (!Array.isArray(color) || color.length < 3) {
     return null;
@@ -114,7 +140,7 @@ function triangleArea(a, b, c) {
   return Math.sqrt(crossValue.x ** 2 + crossValue.y ** 2 + crossValue.z ** 2) * 0.5;
 }
 
-function buildFaceMeta(meshId, faceIndex, faceRange, positions, indices) {
+function buildFaceMeta(meshId, faceIndex, faceRange, positions, indices, totalFaces) {
   const points = [];
   let accumulatedNormal = { x: 0, y: 0, z: 0 };
   let area = 0;
@@ -165,7 +191,7 @@ function buildFaceMeta(meshId, faceIndex, faceRange, positions, indices) {
     triangleFirst: startTriangle,
     triangleLast: endTriangle,
     triangleCount: endTriangle - startTriangle + 1,
-    color: rgbArrayToHex(faceRange.color),
+    color: getFaceColor(faceIndex, totalFaces),
     bounds,
     center: bounds.center,
     normal: normalize(accumulatedNormal),
@@ -189,7 +215,7 @@ function buildMeshRecord(meshIndex, mesh) {
   }
 
   const faceRanges = (mesh.brep_faces || []).map((faceRange, faceIndex) =>
-    buildFaceMeta(meshId, faceIndex, faceRange, positions, indices),
+    buildFaceMeta(meshId, faceIndex, faceRange, positions, indices, mesh.brep_faces.length),
   );
 
   return {
@@ -325,12 +351,11 @@ function buildHierarchyPayload(result, options) {
     node.bbox = bounds;
 
     ownMeshes.forEach((mesh) => {
-      node.faces.push(
-        ...mesh.brepFaces.map((face) => ({
-          ...face,
-          meshName: mesh.name,
-        })),
-      );
+      // 使用引用而非拷贝，这样后续修改 face.renderColor 时 node.faces 也能看到
+      mesh.brepFaces.forEach((face) => {
+        face.meshName = mesh.name;
+        node.faces.push(face);
+      });
       node.topology.faceCount += mesh.topology.faceCount;
       node.topology.solidCount += mesh.topology.solidCount;
       node.topology.vertexCount += mesh.topology.vertexCount;

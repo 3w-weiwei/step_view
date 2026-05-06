@@ -1555,3 +1555,259 @@ select:focus {
     gap: 8px;
   }
 }
+
+/* Viz页面样式 */
+.viz-shell {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  min-height: 100vh;
+  gap: 12px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.viz-shell .workbench-body {
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
+}
+
+.viz-part-list {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 0;
+  height: 100%;
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+.viz-part-list-header {
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.viz-part-list-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.viz-part-count {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.viz-part-list-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.viz-part-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 120ms ease;
+  background: rgba(24, 39, 56, 0.03);
+  border: 1px solid transparent;
+}
+
+.viz-part-item:hover {
+  background: rgba(15, 94, 156, 0.08);
+}
+
+.viz-part-item.is-selected {
+  background: rgba(15, 94, 156, 0.12);
+  border-color: rgba(15, 94, 156, 0.25);
+}
+
+.viz-part-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+
+.viz-part-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.viz-part-list-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.viz-part-list-footer .secondary-button {
+  width: 100%;
+}
+
+.viz-shell .viewer-floating {
+  display: block;
+}
+
+/* 颜色与面映射列表 */
+.face-color-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.face-color-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(24, 39, 56, 0.04);
+}
+
+.face-color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.face-color-id {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: monospace;
+  min-width: 60px;
+}
+
+.face-color-name {
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.face-color-more {
+  padding: 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 参数化摄像机控制面板 */
+.camera-param-group {
+  margin-bottom: 12px;
+}
+
+.camera-param-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.camera-param-row label {
+  flex: 0 0 80px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.camera-param-row input[type="number"],
+.camera-param-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.camera-param-row .param-value {
+  flex: 0 0 50px;
+  text-align: right;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text);
+}
+
+.camera-param-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.camera-param-actions button {
+  flex: 1;
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.camera-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.camera-preset-btn {
+  min-height: 32px;
+  font-size: 11px;
+  padding: 0 8px;
+}
+
+.camera-current-params {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(24, 39, 56, 0.05);
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.camera-current-params strong {
+  color: var(--text);
+}
+
+.range-field {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(24, 39, 56, 0.1);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.range-field::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--brand);
+  cursor: pointer;
+}
+
+/* 显示模式切换 */
+.color-mode-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.color-mode-toggle button {
+  flex: 1;
+  min-height: 36px;
+  font-size: 13px;
+}

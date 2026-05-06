@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d D:/0Learn/myself/vibe-coding/step_cad_harness/**)",
+      "Bash(node --check app.js)",
+      "Bash(node --check mesh-viewer.js)",
+      "Bash(node --check occt-sidecar.js)",
+      "Bash(ls -la D:/0Learn/myself/vibe-coding/step_cad_harness/only_viewer/*.js D:/0Learn/myself/vibe-coding/step_cad_harness/only_viewer/*.html)",
+      "Bash(dir /b D:0Learnmyselfvibe-codingstep_cad_harnessonly_viewer*.js D:0Learnmyselfvibe-codingstep_cad_harnessonly_viewer*.html)",
+      "Bash(cd /d D:0Learnmyselfvibe-codingstep_cad_harnesspython_agent)",
+      "Bash(python -c \"from tools import StepTools, get_tool_definitions, ALL_TOOL_DEFINITIONS; print\\(''Tools imported OK''\\); print\\(f''Total tools: {len\\(ALL_TOOL_DEFINITIONS\\)}''\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(python -m py_compile tools.py)",
+      "Bash(python -c \"from tools import StepTools, get_tool_definitions; print\\(''Import OK''\\)\")",
+      "Bash(python -c \"from tools import StepTools, get_tool_definitions; print\\(''OK, tools:'', len\\(get_tool_definitions\\(\\)\\)\\)\")"
+    ]
+  }
+}
