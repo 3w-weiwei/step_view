@@ -147,6 +147,7 @@ export class WorkbenchViewer {
       fadeOthers: null,
       highlightedFaces: new Map(),
       explodedView: null,
+      partTransforms: new Map(),
     };
 
     this.renderer = new THREE.WebGLRenderer({
@@ -674,6 +675,19 @@ export class WorkbenchViewer {
     this.render();
   }
 
+  setPartTransforms(transforms = null) {
+    const nextTransforms = new Map();
+    normalizeMap(transforms).forEach((value, partId) => {
+      const vector = Array.isArray(value)
+        ? new THREE.Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0)
+        : new THREE.Vector3(Number(value?.x) || 0, Number(value?.y) || 0, Number(value?.z) || 0);
+      nextTransforms.set(partId, vector);
+    });
+    this.state.partTransforms = nextTransforms;
+    this.applyExplodedView();
+    this.render();
+  }
+
   applyExplodedView() {
     const explodedView = this.state.explodedView;
     const bounds = this.sceneData?.bounds;
@@ -712,6 +726,10 @@ export class WorkbenchViewer {
           const distance = baseDistance * factor * (0.35 + Math.min(1.5, Math.abs(projected) / Math.max(modelSize.length() * 0.5, 1)));
           offset.copy(direction).multiplyScalar(distance * signedScale);
         }
+      }
+      const partTransform = this.state.partTransforms.get(record.meshData.nodeId);
+      if (partTransform) {
+        offset.add(partTransform);
       }
 
       record.mesh.position.copy(offset);

@@ -2569,6 +2569,13 @@ async function handleViewerInvoke({ id, method, params }) {
         result = { success: true };
         break;
       }
+      case "setPartTransforms": {
+        if (state.viewer) {
+          state.viewer.setPartTransforms(params?.transforms || null);
+        }
+        result = { success: true };
+        break;
+      }
       case "setCamera": {
         if (state.viewer && params) {
           state.viewer.setCameraBySpherical(

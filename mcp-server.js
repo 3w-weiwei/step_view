@@ -28,13 +28,47 @@ const DEFAULT_MULTIVIEWS = [
   { name: "bottom", azimuth: 0, elevation: -90 },
 ];
 
+const VIEW_PRESETS = {
+  iso: { name: "iso", azimuth: 45, elevation: 30 },
+  front: { name: "front", azimuth: 0, elevation: 0 },
+  back: { name: "back", azimuth: 180, elevation: 0 },
+  left: { name: "left", azimuth: 90, elevation: 0 },
+  right: { name: "right", azimuth: -90, elevation: 0 },
+  top: { name: "top", azimuth: 0, elevation: 90 },
+  bottom: { name: "bottom", azimuth: 0, elevation: -90 },
+};
+
 const viewState = {
   projectId: null,
   colorMode: "face",
   transparency: new Map(),
   highlightedFaces: new Map(),
   explodedView: null,
+  partTransforms: new Map(),
+  section: {
+    enabled: false,
+    axis: "x",
+    offset: 0,
+  },
 };
+
+function resetViewState({ keepColorMode = true } = {}) {
+  const colorMode = viewState.colorMode;
+  viewState.transparency.clear();
+  viewState.highlightedFaces.clear();
+  viewState.explodedView = null;
+  viewState.partTransforms.clear();
+  viewState.section = {
+    enabled: false,
+    axis: "x",
+    offset: 0,
+  };
+  if (!keepColorMode) {
+    viewState.colorMode = "face";
+  } else {
+    viewState.colorMode = colorMode;
+  }
+}
 
 function round(value, digits = 4) {
   const factor = 10 ** digits;
@@ -48,6 +82,24 @@ function textResult(payload) {
         type: "text",
         text: JSON.stringify(payload, null, 2),
       },
+    ],
+  };
+}
+
+function evidenceResult(payload, images = []) {
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(payload, null, 2),
+      },
+      ...images
+        .filter((image) => image?.image)
+        .map((image) => ({
+          type: "image",
+          data: image.image,
+          mimeType: image.mimeType || "image/png",
+        })),
     ],
   };
 }
@@ -155,6 +207,98 @@ function bboxCrossSectionOverlap(left, right, direction) {
     return overlap / denom;
   });
   return round(overlaps[0] * overlaps[1], 4);
+}
+
+function dominantAxisFromVector(vector) {
+  const normalized = normalizeVector(vector);
+  const abs = normalized.map(Math.abs);
+  const index = abs.indexOf(Math.max(...abs));
+  return ["x", "y", "z"][index] || "x";
+}
+
+function axisOffsetFromPoint(axis, point) {
+  const index = { x: 0, y: 1, z: 2 }[axis] ?? 0;
+  return round(point?.[index] || 0, 4);
+}
+
+function viewFromDirection(direction, distance) {
+  const v = normalizeVector(direction);
+  let azimuth = (Math.atan2(v[0], -v[1]) * 180) / Math.PI;
+  if (azimuth < 0) {
+    azimuth += 360;
+  }
+  const elevation = (Math.asin(v[2]) * 180) / Math.PI;
+  return {
+    azimuth: round(azimuth, 1),
+    elevation: round(Math.max(-75, Math.min(75, elevation)), 1),
+    distance,
+  };
+}
+
+function humanViewForTarget(target, assembly, options = {}) {
+  const size = assembly?.bounds?.size || { x: 100, y: 100, z: 100 };
+  const distance = options.distance || Math.max(Math.hypot(size.x || 0, size.y || 0, size.z || 0) * 1.8, 120);
+  const normal = target?.normal ? vectorFromObject(target.normal) : null;
+  if (normal) {
+    const viewDirection = normalizeVector([-normal[0] * 0.85 + 0.35, -normal[1] * 0.85 - 0.25, Math.abs(normal[2]) < 0.7 ? 0.45 : normal[2] * 0.55]);
+    return viewFromDirection(viewDirection, distance);
+  }
+  return { preset: "iso", distance };
+}
+
+function bestSectionForFace(face, assembly) {
+  const normal = vectorFromObject(face?.normal);
+  const axis = dominantAxisFromVector(normal);
+  const center = centerVector(face);
+  const modelSize = assembly?.bounds?.size || {};
+  const axisSize = Number(modelSize[axis] || 100);
+  const inwardBias = Math.max(axisSize * 0.015, 0.5);
+  const axisIndex = { x: 0, y: 1, z: 2 }[axis] ?? 0;
+  const offset = center[axisIndex] - Math.sign(normal[axisIndex] || 1) * inwardBias;
+  return {
+    enabled: true,
+    axis,
+    offset: round(offset, 4),
+    strategy: "face_normal_dominant_axis",
+  };
+}
+
+function bestSectionForContactPair(pair, index, assembly) {
+  const firstFace = pair?.contact_faces?.[0] || pair?.face_pairs?.[0];
+  const faceA = firstFace ? index.faceMap.get(firstFace.face_id) : null;
+  const faceB = firstFace ? index.faceMap.get(firstFace.other_face_id) : null;
+  if (!faceA || !faceB) {
+    return { enabled: true, axis: "x", offset: assembly?.bounds?.center?.x || 0, strategy: "model_center_fallback" };
+  }
+  const centerA = centerVector(faceA);
+  const centerB = centerVector(faceB);
+  const between = [
+    (centerA[0] + centerB[0]) / 2,
+    (centerA[1] + centerB[1]) / 2,
+    (centerA[2] + centerB[2]) / 2,
+  ];
+  const connector = [centerB[0] - centerA[0], centerB[1] - centerA[1], centerB[2] - centerA[2]];
+  const axis = dominantAxisFromVector(Math.hypot(...connector) > 1e-6 ? connector : vectorFromObject(faceA.normal));
+  return {
+    enabled: true,
+    axis,
+    offset: axisOffsetFromPoint(axis, between),
+    strategy: "contact_midplane_dominant_axis",
+  };
+}
+
+function humanViewForPart(part, assembly) {
+  if (!part?.bbox?.center || !assembly?.bounds?.center) {
+    return humanViewForTarget(null, assembly);
+  }
+  const direction = normalizeVector([
+    part.bbox.center.x - assembly.bounds.center.x + 0.25,
+    part.bbox.center.y - assembly.bounds.center.y - 0.25,
+    Math.max(0.35, part.bbox.center.z - assembly.bounds.center.z),
+  ]);
+  const size = assembly.bounds.size || { x: 100, y: 100, z: 100 };
+  const distance = Math.max(Math.hypot(size.x || 0, size.y || 0, size.z || 0) * 1.8, 120);
+  return viewFromDirection(direction, distance);
 }
 
 async function readJson(filePath) {
@@ -365,6 +509,70 @@ function analyzeDirection(part, index, directionInput) {
   };
 }
 
+function findClearanceDirections(part, index, directions = DEFAULT_DIRECTIONS) {
+  return directions
+    .map((entry, itemIndex) => {
+      const vector = Array.isArray(entry) ? entry : entry.vector;
+      return {
+        name: Array.isArray(entry) ? `custom-${itemIndex + 1}` : entry.name,
+        ...analyzeDirection(part, index, vector),
+      };
+    })
+    .sort((left, right) => {
+      const leftBlocked = left.result === "blocked" ? 1 : 0;
+      const rightBlocked = right.result === "blocked" ? 1 : 0;
+      return leftBlocked - rightBlocked || right.confidence - left.confidence || left.blocking_parts.length - right.blocking_parts.length;
+    });
+}
+
+function computeMoveAnalysis(part, index, direction, distance) {
+  const base = analyzeDirection(part, index, direction);
+  const maxBlockingDistance = Math.max(0, Number(distance) || 0);
+  const relevantBlockers = base.blocking_parts.filter((blocker) => blocker.distance_along_direction <= maxBlockingDistance);
+  return {
+    ...base,
+    requested_distance: round(distance),
+    result: relevantBlockers.length ? "blocked" : base.result === "blocked" ? "likely_clear_with_later_blocker" : "likely_clear",
+    blocking_parts_within_distance: relevantBlockers,
+  };
+}
+
+function computeDisassemblyTransforms(index, assembly, factor = 1) {
+  const bounds = assembly?.bounds || {};
+  const center = bounds.center || { x: 0, y: 0, z: 0 };
+  const size = bounds.size || { x: 100, y: 100, z: 100 };
+  const baseDistance = Math.max(Math.hypot(size.x || 0, size.y || 0, size.z || 0) * 0.28, 25) * factor;
+  const transforms = {};
+  const plan = [];
+
+  for (const part of index.parts) {
+    const analyses = findClearanceDirections(part, index);
+    const clear = analyses.find((item) => item.result !== "blocked") || analyses[0];
+    const partCenter = part.bbox?.center || center;
+    const outward = normalizeVector([partCenter.x - center.x, partCenter.y - center.y, partCenter.z - center.z]);
+    const chosen = clear?.result !== "blocked" ? clear.direction : outward;
+    const outwardWeight = Math.max(0, dot(chosen, outward));
+    const direction = normalizeVector([
+      chosen[0] * 0.72 + outward[0] * (0.28 + outwardWeight * 0.2),
+      chosen[1] * 0.72 + outward[1] * (0.28 + outwardWeight * 0.2),
+      chosen[2] * 0.72 + outward[2] * (0.28 + outwardWeight * 0.2),
+    ]);
+    const smallPartBoost = Math.max(0, 1 - Math.cbrt(Math.max((part.bbox?.size?.x || 1) * (part.bbox?.size?.y || 1) * (part.bbox?.size?.z || 1), 1)) / Math.max(Math.cbrt((size.x || 1) * (size.y || 1) * (size.z || 1)), 1));
+    const distance = baseDistance * (0.75 + smallPartBoost * 0.8 + Math.max(0, Number(part.depth || 0)) * 0.08);
+    transforms[part.id] = direction.map((value) => round(value * distance, 4));
+    plan.push({
+      part_id: part.id,
+      part_name: part.name,
+      direction,
+      distance: round(distance),
+      clearance_result: clear?.result || "unknown",
+      blocking_parts: clear?.blocking_parts?.slice(0, 4) || [],
+    });
+  }
+
+  return { transforms, plan };
+}
+
 function invokeViewer(method, params = {}, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ host: TCP_HOST, port: TCP_PORT });
@@ -435,6 +643,42 @@ async function syncViewerVisualState(projectId) {
   await invokeViewer("setExplodedView", {
     explodedView: viewState.explodedView,
   });
+  await invokeViewer("setPartTransforms", {
+    transforms: Object.fromEntries(viewState.partTransforms),
+  });
+  await invokeViewer("setSection", viewState.section);
+}
+
+async function captureViewerEvidence(projectId, view = {}) {
+  await syncViewerVisualState(projectId);
+  if (view.preset && VIEW_PRESETS[view.preset]) {
+    const preset = VIEW_PRESETS[view.preset];
+    await invokeViewer("setCamera", {
+      azimuth: preset.azimuth,
+      elevation: preset.elevation,
+      distance: view.distance,
+      roll: view.roll || 0,
+    });
+  } else if (view.azimuth !== undefined || view.elevation !== undefined || view.distance !== undefined) {
+    const current = await invokeViewer("getCamera").catch(() => ({ params: {} }));
+    await invokeViewer("setCamera", {
+      azimuth: view.azimuth ?? current.params?.azimuth ?? 45,
+      elevation: view.elevation ?? current.params?.elevation ?? 30,
+      distance: view.distance ?? current.params?.distance ?? 200,
+      roll: view.roll ?? current.params?.roll ?? 0,
+    });
+  } else {
+    await invokeViewer("fit");
+  }
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  const screenshot = await invokeViewer("captureScreenshot", {}, 30000);
+  const camera = await invokeViewer("getCamera").catch(() => null);
+  return {
+    image: screenshot?.image,
+    mimeType: screenshot?.mimeType || "image/png",
+    camera: camera?.params || null,
+    view: view.preset || view.name || "current",
+  };
 }
 
 const ProjectIdSchema = z.object({
@@ -449,6 +693,14 @@ const FaceIdSchema = ProjectIdSchema.extend({
   face_id: z.string().describe("BREP face id, for example mesh-0:face-12."),
 });
 
+const ViewSchema = z.object({
+  preset: z.enum(["iso", "front", "back", "left", "right", "top", "bottom"]).optional(),
+  azimuth: z.number().optional(),
+  elevation: z.number().optional(),
+  distance: z.number().optional(),
+  roll: z.number().optional(),
+}).optional();
+
 const server = new McpServer(
   {
     name: "step-cad-assembly-tools",
@@ -456,15 +708,15 @@ const server = new McpServer(
   },
   {
     instructions:
-      "Use these tools as CAD fact extractors, view controllers, and geometry evidence generators. Contact and removability tools return heuristic candidates with confidence, not final mechanical engineering judgments.",
+      "这些工具用于 CAD 事实提取、视角控制和几何证据生成。接触、拆卸和避碰相关工具返回的是启发式候选、置信度和视觉证据，不等同于精确 CAD 内核或工程结论。",
   },
 );
 
 server.registerTool(
   "cad_get_model_summary",
   {
-    title: "Get STEP CAD Model Summary",
-    description: "Return high-level model metadata, parser capability flags, bounds, and counts.",
+    title: "获取 STEP CAD 模型摘要",
+    description: "返回模型元数据、解析能力标记、包围盒、零件数、面数等高层信息。",
     inputSchema: ProjectIdSchema,
   },
   async ({ project_id }) => {
@@ -504,8 +756,8 @@ server.registerTool(
 server.registerTool(
   "cad_get_assembly_tree",
   {
-    title: "Get Assembly Tree",
-    description: "Return the model assembly hierarchy without heavy mesh arrays.",
+    title: "获取装配树",
+    description: "返回模型装配层级结构，不包含沉重的网格数组。",
     inputSchema: ProjectIdSchema,
   },
   async ({ project_id }) => {
@@ -531,10 +783,10 @@ server.registerTool(
 server.registerTool(
   "cad_get_parts",
   {
-    title: "Get Parts",
-    description: "Return compact part-level facts for assembly reasoning.",
+    title: "获取零件列表",
+    description: "返回用于装配推理的零件级概要信息，包括名称、包围盒、颜色和面数量。",
     inputSchema: ProjectIdSchema.extend({
-      include_contact_preview: z.boolean().optional().describe("Include top neighbor/contact candidates per part."),
+      include_contact_preview: z.boolean().optional().describe("是否包含每个零件的主要邻近/接触候选。"),
     }),
   },
   async ({ project_id, include_contact_preview }) => {
@@ -553,10 +805,10 @@ server.registerTool(
 server.registerTool(
   "cad_get_part_faces",
   {
-    title: "Get Part Faces",
-    description: "Return BREP face facts for a part: ids, colors, centers, normals, areas, and triangle ranges.",
+    title: "获取零件 BREP 面",
+    description: "返回指定零件的 BREP 面信息，包括 face_id、颜色、中心点、法向、面积和三角片范围。",
     inputSchema: PartIdSchema.extend({
-      max_faces: z.number().int().positive().optional().describe("Optional limit for large parts."),
+      max_faces: z.number().int().positive().optional().describe("大型零件可用该参数限制返回的面数量。"),
     }),
   },
   async ({ project_id, part_id, max_faces }) => {
@@ -579,8 +831,8 @@ server.registerTool(
 server.registerTool(
   "cad_get_face_detail",
   {
-    title: "Get Face Detail",
-    description: "Return one face with owning part and local contact candidates.",
+    title: "获取面详情",
+    description: "返回指定 BREP 面的详细信息、所属零件，以及可选的局部接触候选。",
     inputSchema: FaceIdSchema.extend({
       include_contact_candidates: z.boolean().optional(),
     }),
@@ -616,8 +868,8 @@ server.registerTool(
 server.registerTool(
   "cad_get_contact_candidates",
   {
-    title: "Get Contact Candidates",
-    description: "Return heuristic contact or mating-face candidates for one part. Results are candidates with confidence, not exact CAD contact facts.",
+    title: "获取接触候选",
+    description: "返回指定零件的启发式接触/配合面候选。结果包含置信度，不代表精确 CAD 接触判定。",
     inputSchema: PartIdSchema.extend({
       max_distance: z.number().nonnegative().optional(),
       min_confidence: z.number().min(0).max(1).optional(),
@@ -645,12 +897,65 @@ server.registerTool(
 );
 
 server.registerTool(
+  "cad_get_contact_pairs",
+  {
+    title: "获取接触零件对",
+    description: "返回零件对级别的接触候选，以及代表性的接触面信息。这是启发式证据，不是精确接触求解器。",
+    inputSchema: ProjectIdSchema.extend({
+      part_id: z.string().optional().describe("可选零件 ID。不填则返回整个装配体的主要接触零件对。"),
+      max_distance: z.number().nonnegative().optional(),
+      min_confidence: z.number().min(0).max(1).optional(),
+      max_pairs: z.number().int().positive().optional(),
+    }),
+  },
+  async ({ project_id, part_id, max_distance, min_confidence, max_pairs }) => {
+    const { manifest, assembly } = await resolveProject(project_id);
+    const index = buildIndex(assembly);
+    const pairs = [];
+    const seen = new Set();
+    const parts = part_id ? [index.nodeMap.get(part_id)].filter(Boolean) : index.parts;
+
+    for (const part of parts) {
+      if (!part || part.kind !== "part") {
+        continue;
+      }
+      const candidates = buildContactCandidates(part, index, {
+        maxDistance: max_distance,
+        minConfidence: min_confidence,
+        maxPairs: max_pairs || 200,
+      });
+      for (const candidate of candidates) {
+        const key = [part.id, candidate.other_part_id].sort().join("::");
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        pairs.push({
+          part_a: { id: part.id, name: part.name },
+          part_b: { id: candidate.other_part_id, name: candidate.other_part_name },
+          confidence: candidate.confidence,
+          relation_type: candidate.relation_type,
+          contact_faces: candidate.face_pairs,
+        });
+      }
+    }
+
+    pairs.sort((a, b) => b.confidence - a.confidence);
+    return textResult({
+      project_id: manifest.projectId,
+      method: "bbox_normal_area_heuristic",
+      contact_pairs: pairs.slice(0, max_pairs || 50),
+    });
+  },
+);
+
+server.registerTool(
   "cad_set_color_mode",
   {
-    title: "Set Color Mode",
-    description: "Set current visual color mode for later renders. Uses the live Electron viewer when available.",
+    title: "设置着色模式",
+    description: "设置当前可视化着色模式，用于后续截图。若 Electron viewer 正在运行，会同步到实时视图。",
     inputSchema: ProjectIdSchema.extend({
-      mode: z.enum(["part", "face", "id_map"]).describe("part and face map to current viewer modes; id_map is recorded for evidence planning."),
+      mode: z.enum(["part", "face", "id_map"]).describe("part 表示零件级着色，face 表示 BREP 面级着色，id_map 用于后续机器可读图规划。"),
     }),
   },
   async ({ project_id, mode }) => {
@@ -671,17 +976,55 @@ server.registerTool(
 );
 
 server.registerTool(
-  "cad_set_transparency",
+  "cad_reset_view_state",
   {
-    title: "Set Transparency",
-    description: "Set per-part transparency for visual evidence. Uses the live Electron viewer when available.",
+    title: "还原视图状态和零件位置",
+    description: "清除透明度、高亮面、爆炸视图、零件移动预览和剖切状态，并可选返回还原后的截图。",
     inputSchema: ProjectIdSchema.extend({
-      part_ids: z.array(z.string()).describe("Part ids to make transparent."),
-      level: z.number().min(0).max(1).describe("0 means opaque, 1 means fully transparent."),
-      mode: z.enum(["set", "fade_others", "clear"]).optional(),
+      keep_color_mode: z.boolean().optional().describe("是否保留当前着色模式，默认 true。"),
+      return_image: z.boolean().optional().describe("是否返回还原后的截图，默认 true。"),
+      view: ViewSchema,
     }),
   },
-  async ({ project_id, part_ids, level, mode }) => {
+  async ({ project_id, keep_color_mode, return_image, view }) => {
+    const { manifest } = await resolveProject(project_id);
+    viewState.projectId = manifest.projectId;
+    resetViewState({ keepColorMode: keep_color_mode !== false });
+    await syncViewerVisualState(manifest.projectId);
+    const payload = {
+      success: true,
+      project_id: manifest.projectId,
+      view_state: {
+        color_mode: viewState.colorMode,
+        transparency: Object.fromEntries(viewState.transparency),
+        highlighted_faces: Object.fromEntries(viewState.highlightedFaces),
+        exploded_view: viewState.explodedView,
+        part_transforms: Object.fromEntries(viewState.partTransforms),
+        section: viewState.section,
+      },
+    };
+    if (return_image !== false) {
+      const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
+      return evidenceResult({ ...payload, evidence: { camera: evidence.camera, view: evidence.view } }, [evidence]);
+    }
+    return textResult(payload);
+  },
+);
+
+server.registerTool(
+  "cad_set_transparency",
+  {
+    title: "设置零件透明度并返回证据图",
+    description: "设置指定零件透明度，并默认返回应用后的截图证据。",
+    inputSchema: ProjectIdSchema.extend({
+      part_ids: z.array(z.string()).describe("需要设置透明度的零件 ID。"),
+      level: z.number().min(0).max(1).describe("透明度等级，0 表示不透明，1 表示完全透明。"),
+      mode: z.enum(["set", "fade_others", "clear"]).optional(),
+      return_image: z.boolean().optional().describe("是否在设置后返回截图，默认 true。"),
+      view: ViewSchema,
+    }),
+  },
+  async ({ project_id, part_ids, level, mode, return_image, view }) => {
     const { manifest } = await resolveProject(project_id);
     viewState.projectId = manifest.projectId;
     if (mode === "clear") {
@@ -703,23 +1046,28 @@ server.registerTool(
     } catch (error) {
       viewer_result = { warning: error.message };
     }
-    return textResult({
+    const payload = {
       success: true,
       project_id: manifest.projectId,
       transparency: Object.fromEntries(viewState.transparency),
       viewer_result,
-    });
+    };
+    if (return_image !== false) {
+      const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
+      return evidenceResult({ ...payload, evidence: { camera: evidence.camera, view: evidence.view } }, [evidence]);
+    }
+    return textResult(payload);
   },
 );
 
 server.registerTool(
   "cad_highlight_faces",
   {
-    title: "Highlight Faces",
-    description: "Record face highlights for visual evidence and return face legend entries.",
+    title: "高亮 BREP 面",
+    description: "高亮指定 BREP 面，并返回高亮图例信息。",
     inputSchema: ProjectIdSchema.extend({
-      face_ids: z.array(z.string()).describe("BREP face ids to highlight."),
-      color: z.string().optional().describe("CSS hex color, for example #ffcc00."),
+      face_ids: z.array(z.string()).describe("需要高亮的 BREP face_id 列表。"),
+      color: z.string().optional().describe("高亮颜色，例如 #ffcc00。"),
       clear_existing: z.boolean().optional(),
     }),
   },
@@ -770,17 +1118,19 @@ server.registerTool(
 server.registerTool(
   "cad_set_exploded_view",
   {
-    title: "Set Exploded View",
-    description: "Record an exploded-view transform plan for assembly evidence. This is a view controller, not a geometry fact.",
+    title: "设置爆炸视图并返回证据图",
+    description: "应用统一方向/径向/层级爆炸视图，并默认返回截图。这是视图控制，不是几何事实。",
     inputSchema: ProjectIdSchema.extend({
-      direction: z.array(z.number()).length(3).describe("Explosion direction vector [x,y,z]."),
-      factor: z.number().min(0).describe("Explosion scale factor."),
+      direction: z.array(z.number()).length(3).describe("爆炸方向向量 [x,y,z]。"),
+      factor: z.number().min(0).describe("爆炸缩放系数。"),
       scope: z.enum(["assembly", "selected", "part_neighbors"]).optional(),
       anchor_part_id: z.string().optional(),
       mode: z.enum(["linear", "radial", "hierarchy"]).optional(),
+      return_image: z.boolean().optional().describe("是否在设置后返回截图，默认 true。"),
+      view: ViewSchema,
     }),
   },
-  async ({ project_id, direction, factor, scope, anchor_part_id, mode }) => {
+  async ({ project_id, direction, factor, scope, anchor_part_id, mode, return_image, view }) => {
     const { manifest } = await resolveProject(project_id);
     viewState.projectId = manifest.projectId;
     viewState.explodedView = {
@@ -790,6 +1140,7 @@ server.registerTool(
       anchor_part_id: anchor_part_id || null,
       mode: mode || "linear",
     };
+    viewState.partTransforms.clear();
     let viewer_result = null;
     try {
       await ensureViewerProject(manifest.projectId);
@@ -799,20 +1150,25 @@ server.registerTool(
     } catch (error) {
       viewer_result = { warning: error.message };
     }
-    return textResult({
+    const payload = {
       success: true,
       project_id: manifest.projectId,
       exploded_view: viewState.explodedView,
       viewer_result,
-    });
+    };
+    if (return_image !== false) {
+      const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
+      return evidenceResult({ ...payload, evidence: { camera: evidence.camera, view: evidence.view } }, [evidence]);
+    }
+    return textResult(payload);
   },
 );
 
 server.registerTool(
   "cad_render_multiview",
   {
-    title: "Render Multiview Evidence",
-    description: "Capture multiple views from the live Electron viewer. Start npm start first. Returns images plus CAD legend and active view state.",
+    title: "渲染多视角证据图",
+    description: "从实时 Electron viewer 捕获多个视角图片，返回图片、图例和当前视图状态。使用前需启动 npm start。",
     inputSchema: ProjectIdSchema.extend({
       views: z
         .array(
@@ -836,7 +1192,12 @@ server.registerTool(
       await invokeViewer("selectParts", { partIds: selected_part_ids });
     }
     const result = await invokeViewer("captureMultiview", { angles: views || DEFAULT_MULTIVIEWS }, 60000);
-    return textResult({
+    const images = (result.views || []).map((view) => ({
+      image: view.image,
+      mimeType: "image/png",
+      name: view.name,
+    }));
+    return evidenceResult({
       success: true,
       project_id: manifest.projectId,
       render_mode: viewState.colorMode,
@@ -851,16 +1212,288 @@ server.registerTool(
         color: part.color,
         face_count: part.topology?.faceCount || (part.faces || []).length,
       })),
-      viewer_result: result,
+      views: (result.views || []).map((view) => ({
+        name: view.name,
+        label: view.label,
+        azimuth: view.azimuth,
+        elevation: view.elevation,
+        has_image: Boolean(view.image),
+      })),
+    }, images);
+  },
+);
+
+server.registerTool(
+  "cad_render_view",
+  {
+    title: "渲染单视角证据图",
+    description: "设置固定视角或自定义相机并返回截图，是 Agent 获取视觉证据的主要视角控制工具。",
+    inputSchema: ProjectIdSchema.extend({
+      view: ViewSchema.describe("可使用 preset 固定视角，也可使用 azimuth/elevation/distance 自主控制相机。"),
+      selected_part_ids: z.array(z.string()).optional(),
+      color_mode: z.enum(["part", "face", "id_map"]).optional(),
+    }),
+  },
+  async ({ project_id, view, selected_part_ids, color_mode }) => {
+    const { manifest } = await resolveProject(project_id);
+    if (color_mode) {
+      viewState.colorMode = color_mode;
+    }
+    await syncViewerVisualState(manifest.projectId);
+    if (selected_part_ids?.length) {
+      await invokeViewer("selectParts", { partIds: selected_part_ids });
+    }
+    const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
+    return evidenceResult({
+      success: true,
+      project_id: manifest.projectId,
+      render_mode: viewState.colorMode,
+      view_state: {
+        transparency: Object.fromEntries(viewState.transparency),
+        highlighted_faces: Object.fromEntries(viewState.highlightedFaces),
+        exploded_view: viewState.explodedView,
+        part_transforms: Object.fromEntries(viewState.partTransforms),
+        section: viewState.section,
+      },
+      evidence: {
+        camera: evidence.camera,
+        view: evidence.view,
+      },
+    }, [evidence]);
+  },
+);
+
+server.registerTool(
+  "cad_render_section_view",
+  {
+    title: "渲染剖切视图证据图",
+    description: "启用剖切平面并返回截图，用于观察内部结构或接触区域。",
+    inputSchema: ProjectIdSchema.extend({
+      enabled: z.boolean().optional(),
+      axis: z.enum(["x", "y", "z"]).optional(),
+      offset: z.number().optional().describe("剖切平面偏移量，单位为模型单位。"),
+      view: ViewSchema,
+      selected_part_ids: z.array(z.string()).optional(),
+    }),
+  },
+  async ({ project_id, enabled, axis, offset, view, selected_part_ids }) => {
+    const { manifest } = await resolveProject(project_id);
+    viewState.projectId = manifest.projectId;
+    viewState.section = {
+      enabled: enabled !== false,
+      axis: axis || viewState.section.axis || "x",
+      offset: Number(offset ?? viewState.section.offset ?? 0),
+    };
+    await syncViewerVisualState(manifest.projectId);
+    if (selected_part_ids?.length) {
+      await invokeViewer("selectParts", { partIds: selected_part_ids });
+    }
+    const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
+    return evidenceResult({
+      success: true,
+      project_id: manifest.projectId,
+      section: viewState.section,
+      evidence: {
+        camera: evidence.camera,
+        view: evidence.view,
+      },
+    }, [evidence]);
+  },
+);
+
+server.registerTool(
+  "cad_render_target_section",
+  {
+    title: "自动渲染目标剖切证据图",
+    description: "根据目标面或接触零件对自动选择剖切平面和符合人类习惯的观察视角，用于查看目标内部。",
+    inputSchema: ProjectIdSchema.extend({
+      face_id: z.string().optional(),
+      part_id: z.string().optional(),
+      other_part_id: z.string().optional(),
+      mode: z.enum(["through_face", "near_face", "contact_pair"]).optional(),
+      view: ViewSchema,
+    }),
+  },
+  async ({ project_id, face_id, part_id, other_part_id, mode, view }) => {
+    const { manifest, assembly } = await resolveProject(project_id);
+    const index = buildIndex(assembly);
+    let section = null;
+    let targetFace = null;
+    let contactPair = null;
+
+    if (face_id) {
+      targetFace = index.faceMap.get(face_id);
+      if (!targetFace) {
+        throw new Error(`Face not found: ${face_id}`);
+      }
+      section = bestSectionForFace(targetFace, assembly);
+    } else if (part_id && other_part_id) {
+      const part = index.nodeMap.get(part_id);
+      if (!part || part.kind !== "part") {
+        throw new Error(`Part not found: ${part_id}`);
+      }
+      contactPair = buildContactCandidates(part, index, { maxPairs: 50 }).find((candidate) => candidate.other_part_id === other_part_id);
+      if (!contactPair) {
+        throw new Error(`No contact candidate found for ${part_id} and ${other_part_id}`);
+      }
+      section = bestSectionForContactPair(contactPair, index, assembly);
+      const firstPair = contactPair.contact_faces?.[0] || contactPair.face_pairs?.[0];
+      targetFace = firstPair ? index.faceMap.get(firstPair.face_id) : null;
+    } else if (part_id) {
+      const part = index.nodeMap.get(part_id);
+      if (!part || part.kind !== "part") {
+        throw new Error(`Part not found: ${part_id}`);
+      }
+      const largestFace = [...(part.faces || [])].sort((a, b) => (b.area || 0) - (a.area || 0))[0];
+      targetFace = largestFace || null;
+      section = largestFace
+        ? bestSectionForFace(largestFace, assembly)
+        : { enabled: true, axis: "x", offset: part.bbox?.center?.x || 0, strategy: "part_center_fallback" };
+    } else {
+      throw new Error("Provide face_id, part_id, or part_id + other_part_id.");
+    }
+
+    viewState.projectId = manifest.projectId;
+    viewState.section = section;
+    if (targetFace) {
+      viewState.highlightedFaces.set(targetFace.id, "#ffcc00");
+    }
+    const autoView = view || humanViewForTarget(targetFace, assembly);
+    const evidence = await captureViewerEvidence(manifest.projectId, autoView);
+    return evidenceResult({
+      success: true,
+      project_id: manifest.projectId,
+      mode: mode || (contactPair ? "contact_pair" : "near_face"),
+      section,
+      target: {
+        face_id: targetFace?.id || null,
+        part_id: targetFace ? index.faceOwner.get(targetFace.id) : part_id || null,
+        other_part_id: other_part_id || null,
+      },
+      contact_pair: contactPair || null,
+      evidence: {
+        camera: evidence.camera,
+        view: evidence.view,
+        auto_view_used: !view,
+      },
+    }, [evidence]);
+  },
+);
+
+server.registerTool(
+  "cad_find_clearance_directions",
+  {
+    title: "查找可能无碰撞的移动方向",
+    description: "使用扫掠包围盒启发式方法，对零件可能无碰撞移动的方向进行排序。",
+    inputSchema: PartIdSchema.extend({
+      directions: z.array(z.array(z.number()).length(3)).optional(),
+    }),
+  },
+  async ({ project_id, part_id, directions }) => {
+    const { manifest, assembly } = await resolveProject(project_id);
+    const index = buildIndex(assembly);
+    const part = index.nodeMap.get(part_id);
+    if (!part || part.kind !== "part") {
+      throw new Error(`Part not found: ${part_id}`);
+    }
+    return textResult({
+      project_id: manifest.projectId,
+      part: compactPart(part),
+      directions: findClearanceDirections(part, index, directions || DEFAULT_DIRECTIONS),
     });
+  },
+);
+
+server.registerTool(
+  "cad_render_move_preview",
+  {
+    title: "渲染零件移动预览证据图",
+    description: "将指定零件沿给定方向移动指定距离，返回移动后的截图和可能阻挡零件分析。该工具会自动关闭剖切状态。",
+    inputSchema: PartIdSchema.extend({
+      direction: z.array(z.number()).length(3),
+      distance: z.number().positive(),
+      fade_context_level: z.number().min(0).max(1).optional(),
+      view: ViewSchema,
+    }),
+  },
+  async ({ project_id, part_id, direction, distance, fade_context_level, view }) => {
+    const { manifest, assembly } = await resolveProject(project_id);
+    const index = buildIndex(assembly);
+    const part = index.nodeMap.get(part_id);
+    if (!part || part.kind !== "part") {
+      throw new Error(`Part not found: ${part_id}`);
+    }
+    const normalized = normalizeVector(direction);
+    const moveVector = normalized.map((value) => round(value * distance, 4));
+    const analysis = computeMoveAnalysis(part, index, normalized, distance);
+    viewState.section = { enabled: false, axis: "x", offset: 0 };
+    viewState.explodedView = null;
+    viewState.highlightedFaces.clear();
+    viewState.partTransforms = new Map([[part_id, moveVector]]);
+    viewState.transparency.clear();
+    if (fade_context_level !== undefined) {
+      for (const otherPart of index.parts) {
+        if (otherPart.id !== part_id) {
+          viewState.transparency.set(otherPart.id, fade_context_level);
+        }
+      }
+    }
+    const autoView = view || humanViewForPart(part, assembly);
+    const evidence = await captureViewerEvidence(manifest.projectId, autoView);
+    return evidenceResult({
+      success: true,
+      project_id: manifest.projectId,
+      part: compactPart(part),
+      move_vector: moveVector,
+      analysis,
+      evidence: {
+        camera: evidence.camera,
+        view: evidence.view,
+        auto_view_used: !view,
+      },
+    }, [evidence]);
+  },
+);
+
+server.registerTool(
+  "cad_render_disassembly_exploded_view",
+  {
+    title: "渲染拆卸式爆炸视图证据图",
+    description: "基于可能拆卸方向和向外布局为每个零件分配独立位移，生成更符合装配拆卸习惯的爆炸视图并返回图片。",
+    inputSchema: ProjectIdSchema.extend({
+      factor: z.number().positive().optional(),
+      view: ViewSchema,
+    }),
+  },
+  async ({ project_id, factor, view }) => {
+    const { manifest, assembly } = await resolveProject(project_id);
+    const index = buildIndex(assembly);
+    const { transforms, plan } = computeDisassemblyTransforms(index, assembly, factor || 1);
+    viewState.projectId = manifest.projectId;
+    viewState.section = { enabled: false, axis: "x", offset: 0 };
+    viewState.explodedView = null;
+    viewState.partTransforms = new Map(Object.entries(transforms));
+    const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
+    return evidenceResult({
+      success: true,
+      project_id: manifest.projectId,
+      strategy: "clearance_direction_plus_outward_layout",
+      transform_count: Object.keys(transforms).length,
+      plan,
+      evidence: {
+        camera: evidence.camera,
+        view: evidence.view,
+        auto_view_used: !view,
+      },
+    }, [evidence]);
   },
 );
 
 server.registerTool(
   "cad_analyze_removal_directions",
   {
-    title: "Analyze Removal Directions",
-    description: "Check linear removal clearance candidates for a part. This is swept-bbox heuristic evidence, not a final removability verdict.",
+    title: "分析零件拆卸方向",
+    description: "分析零件沿若干方向线性移动时的避碰候选。该工具是启发式分析，不是最终可拆卸性判定。",
     inputSchema: PartIdSchema.extend({
       directions: z.array(z.array(z.number()).length(3)).optional(),
     }),
@@ -876,10 +1509,7 @@ server.registerTool(
     return textResult({
       project_id: manifest.projectId,
       part: compactPart(part),
-      analyses: directionList.map((entry) => ({
-        name: entry.name,
-        ...analyzeDirection(part, index, entry.vector),
-      })),
+      analyses: findClearanceDirections(part, index, directionList),
     });
   },
 );

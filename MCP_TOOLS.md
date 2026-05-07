@@ -31,21 +31,76 @@ Data and geometry facts:
 - `cad_get_part_faces`
 - `cad_get_face_detail`
 - `cad_get_contact_candidates`
+- `cad_get_contact_pairs`
+- `cad_find_clearance_directions`
 - `cad_analyze_removal_directions`
 
 View state and visual evidence:
 
 - `cad_set_color_mode`
+- `cad_reset_view_state`
 - `cad_set_transparency`
 - `cad_highlight_faces`
 - `cad_set_exploded_view`
+- `cad_render_view`
+- `cad_render_section_view`
+- `cad_render_target_section`
+- `cad_render_move_preview`
+- `cad_render_disassembly_exploded_view`
 - `cad_render_multiview`
 
 ## Important Limits
 
 Contact and removal tools are intentionally conservative heuristics. They return candidates, blockers, confidence, and method metadata. They do not replace exact CAD-kernel contact solving, motion planning, fastener recognition, or mechanical engineering judgement.
 
-`cad_set_transparency`, `cad_highlight_faces`, and `cad_set_exploded_view` maintain MCP view state and now sync that state into the live Electron viewer when it is running. `cad_render_multiview` reloads the same state before capture so screenshots include transparency, highlighted faces, and exploded transforms.
+Visual evidence tools return image content directly when the Electron viewer is running. `cad_set_transparency` and `cad_set_exploded_view` apply the state and return a screenshot by default. `cad_render_view`, `cad_render_section_view`, and `cad_render_multiview` reload the same state before capture so screenshots include transparency, highlighted faces, exploded transforms, and section clipping.
+
+Use `cad_reset_view_state` to restore normal view state: it clears transparency, highlighted faces, exploded view, per-part movement, and section clipping.
+
+Most visual tools choose a human-friendly default view when `view` is omitted. For target faces, the camera is biased toward the face normal with a slight oblique angle. For parts, the camera is biased outward from the model center. For section views, `cad_render_target_section` chooses the section axis and offset from the target face or contact pair.
+
+Agents can use fixed views with `view.preset`:
+
+```json
+{
+  "view": { "preset": "front" }
+}
+```
+
+Or choose their own camera:
+
+```json
+{
+  "view": { "azimuth": 35, "elevation": 18, "distance": 240 }
+}
+```
+
+Target section:
+
+```json
+{
+  "face_id": "mesh-0:face-0"
+}
+```
+
+Move preview:
+
+```json
+{
+  "part_id": "node-2",
+  "direction": [1, 0, 0],
+  "distance": 40,
+  "fade_context_level": 0.55
+}
+```
+
+Disassembly-style exploded view:
+
+```json
+{
+  "factor": 1.2
+}
+```
 
 ## MCP Inspector
 
