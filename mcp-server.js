@@ -40,7 +40,7 @@ const VIEW_PRESETS = {
 
 const viewState = {
   projectId: null,
-  colorMode: "face",
+  colorMode: "part",
   transparency: new Map(),
   highlightedFaces: new Map(),
   explodedView: null,
@@ -64,7 +64,7 @@ function resetViewState({ keepColorMode = true } = {}) {
     offset: 0,
   };
   if (!keepColorMode) {
-    viewState.colorMode = "face";
+    viewState.colorMode = "part";
   } else {
     viewState.colorMode = colorMode;
   }
@@ -101,6 +101,30 @@ function evidenceResult(payload, images = []) {
           mimeType: image.mimeType || "image/png",
         })),
     ],
+  };
+}
+
+async function saveEvidenceImage(projectId, imageBase64, label = "view") {
+  if (!imageBase64) {
+    return null;
+  }
+  const safeProjectId = String(projectId || "unknown").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeLabel = String(label || "view").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const evidenceDir = path.join(PROJECT_ROOT, safeProjectId, "visual-evidence");
+  await fs.mkdir(evidenceDir, { recursive: true });
+  const filePath = path.join(evidenceDir, `${Date.now()}-${safeLabel}.png`);
+  await fs.writeFile(filePath, Buffer.from(imageBase64, "base64"));
+  return filePath;
+}
+
+function evidenceMeta(evidence) {
+  return {
+    camera: evidence.camera,
+    view: evidence.view,
+    has_image: Boolean(evidence.image),
+    image_path: evidence.imagePath || null,
+    image_mime_type: evidence.mimeType || "image/png",
+    warning: evidence.warning || null,
   };
 }
 
@@ -673,11 +697,16 @@ async function captureViewerEvidence(projectId, view = {}) {
   await new Promise((resolve) => setTimeout(resolve, 80));
   const screenshot = await invokeViewer("captureScreenshot", {}, 30000);
   const camera = await invokeViewer("getCamera").catch(() => null);
+  const rawImage = screenshot?.image || "";
+  const image = rawImage.startsWith("data:image") ? rawImage.split(",")[1] : rawImage;
+  const imagePath = image ? await saveEvidenceImage(projectId, image, view.preset || view.name || "current") : null;
   return {
-    image: screenshot?.image,
+    image,
+    imagePath,
     mimeType: screenshot?.mimeType || "image/png",
     camera: camera?.params || null,
     view: view.preset || view.name || "current",
+    warning: screenshot?.error || (!image ? "Viewer returned no screenshot image. Check that the Electron viewer is running, the project is loaded, and the canvas is visible." : null),
   };
 }
 
@@ -1005,7 +1034,7 @@ server.registerTool(
     };
     if (return_image !== false) {
       const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
-      return evidenceResult({ ...payload, evidence: { camera: evidence.camera, view: evidence.view } }, [evidence]);
+      return evidenceResult({ ...payload, evidence: evidenceMeta(evidence) }, [evidence]);
     }
     return textResult(payload);
   },
@@ -1054,7 +1083,7 @@ server.registerTool(
     };
     if (return_image !== false) {
       const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
-      return evidenceResult({ ...payload, evidence: { camera: evidence.camera, view: evidence.view } }, [evidence]);
+      return evidenceResult({ ...payload, evidence: evidenceMeta(evidence) }, [evidence]);
     }
     return textResult(payload);
   },
@@ -1158,7 +1187,7 @@ server.registerTool(
     };
     if (return_image !== false) {
       const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
-      return evidenceResult({ ...payload, evidence: { camera: evidence.camera, view: evidence.view } }, [evidence]);
+      return evidenceResult({ ...payload, evidence: evidenceMeta(evidence) }, [evidence]);
     }
     return textResult(payload);
   },
@@ -1192,7 +1221,12 @@ server.registerTool(
       await invokeViewer("selectParts", { partIds: selected_part_ids });
     }
     const result = await invokeViewer("captureMultiview", { angles: views || DEFAULT_MULTIVIEWS }, 60000);
-    const images = (result.views || []).map((view) => ({
+    const viewsWithImages = [];
+    for (const view of result.views || []) {
+      const imagePath = await saveEvidenceImage(manifest.projectId, view.image, view.name);
+      viewsWithImages.push({ ...view, imagePath });
+    }
+    const images = viewsWithImages.map((view) => ({
       image: view.image,
       mimeType: "image/png",
       name: view.name,
@@ -1212,12 +1246,13 @@ server.registerTool(
         color: part.color,
         face_count: part.topology?.faceCount || (part.faces || []).length,
       })),
-      views: (result.views || []).map((view) => ({
+      views: viewsWithImages.map((view) => ({
         name: view.name,
         label: view.label,
         azimuth: view.azimuth,
         elevation: view.elevation,
         has_image: Boolean(view.image),
+        image_path: view.imagePath || null,
       })),
     }, images);
   },
@@ -1255,10 +1290,7 @@ server.registerTool(
         part_transforms: Object.fromEntries(viewState.partTransforms),
         section: viewState.section,
       },
-      evidence: {
-        camera: evidence.camera,
-        view: evidence.view,
-      },
+      evidence: evidenceMeta(evidence),
     }, [evidence]);
   },
 );
@@ -1293,10 +1325,7 @@ server.registerTool(
       success: true,
       project_id: manifest.projectId,
       section: viewState.section,
-      evidence: {
-        camera: evidence.camera,
-        view: evidence.view,
-      },
+      evidence: evidenceMeta(evidence),
     }, [evidence]);
   },
 );
@@ -1371,11 +1400,7 @@ server.registerTool(
         other_part_id: other_part_id || null,
       },
       contact_pair: contactPair || null,
-      evidence: {
-        camera: evidence.camera,
-        view: evidence.view,
-        auto_view_used: !view,
-      },
+      evidence: { ...evidenceMeta(evidence), auto_view_used: !view },
     }, [evidence]);
   },
 );
@@ -1446,11 +1471,7 @@ server.registerTool(
       part: compactPart(part),
       move_vector: moveVector,
       analysis,
-      evidence: {
-        camera: evidence.camera,
-        view: evidence.view,
-        auto_view_used: !view,
-      },
+      evidence: { ...evidenceMeta(evidence), auto_view_used: !view },
     }, [evidence]);
   },
 );
@@ -1480,11 +1501,7 @@ server.registerTool(
       strategy: "clearance_direction_plus_outward_layout",
       transform_count: Object.keys(transforms).length,
       plan,
-      evidence: {
-        camera: evidence.camera,
-        view: evidence.view,
-        auto_view_used: !view,
-      },
+      evidence: { ...evidenceMeta(evidence), auto_view_used: !view },
     }, [evidence]);
   },
 );

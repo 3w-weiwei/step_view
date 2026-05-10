@@ -1,0 +1,14 @@
+interface:
+  display_name: "CAD Assembly Sequence Analysis"
+  short_description: "Guide evidence-based assembly sequencing from STEP CAD MCP tools."
+  default_prompt: "Use $cad-assembly-sequence-analysis to analyze this STEP CAD assembly and produce a fact-grounded assembly sequence."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "step-cad"
+      description: "Local STEP CAD MCP server exposing assembly, contact, clearance, removal, and render tools."
+      transport: "stdio"
+
+policy:
+  allow_implicit_invocation: true

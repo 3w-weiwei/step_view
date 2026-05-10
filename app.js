@@ -289,7 +289,7 @@ function createVizState(project, previousState) {
       distance: 200,
       roll: 0,
     },
-    colorMode: previousForSameProject?.colorMode || "face", // "face" 或 "part"
+    colorMode: previousForSameProject?.colorMode || "part", // "face" 或 "part"
     viewerHint: previousForSameProject?.viewerHint || "拖拽旋转，滚轮缩放",
   };
 }

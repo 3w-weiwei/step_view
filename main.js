@@ -79,16 +79,19 @@ async function handleTcpMessage(clientSocket, message) {
     }
 
     const timeoutMs = 30000;
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Renderer invoke timeout")), timeoutMs)
-    );
+    let timeoutId = null;
+    let handler = null;
+    const timeout = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("Renderer invoke timeout")), timeoutMs);
+    });
 
     const invokePromise = new Promise((resolve, reject) => {
       // Set up one-time listener for the result from renderer
-      const handler = (event, { id: resultId, result, error }) => {
+      handler = (event, { id: resultId, result, error }) => {
         console.error("[TCP Bridge] viewer:return received:", { resultId, id, hasResult: !!result, hasError: !!error });
         if (resultId === id) {
           ipcMain.removeListener("viewer:return", handler);
+          clearTimeout(timeoutId);
           if (error) reject(new Error(error));
           else resolve(result);
         }
@@ -109,7 +112,10 @@ async function handleTcpMessage(clientSocket, message) {
       clientSocket.write(JSON.stringify({ type: "invoke-result", id, error: error.message }) + "\n");
     } finally {
       // Clean up listener
-      ipcMain.removeAllListeners("viewer:return");
+      clearTimeout(timeoutId);
+      if (handler) {
+        ipcMain.removeListener("viewer:return", handler);
+      }
     }
   } else if (type === "list-methods") {
     // Return list of available methods
