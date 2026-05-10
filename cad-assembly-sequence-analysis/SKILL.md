@@ -55,8 +55,11 @@ Use this skill to derive a mechanical assembly sequence from STEP CAD MCP eviden
    - Insert inspection or verification notes where the tool evidence is heuristic or incomplete.
 
 6. Produce a result:
+   - Output two main sections: first a per-part assembly feature analysis, then the assembly sequence.
+   - For each part, describe only evidence-supported basic assembly features such as holes, shaft-like geometry, thread-like geometry, planar mating faces, cylindrical mating faces, slots, pins, covers, access-blocking regions, or unknown. Use cautious wording for inferred features.
+   - For each part, include geometric relationships, contact relationships, removable/installable directions, process accessibility, and visual evidence.
    - Output assembly steps in order.
-   - For each step, include part IDs/names, action, direction/orientation when known, evidence, blockers resolved, confidence, and assumptions.
+   - For each step, include part IDs/names, assembly type, action, direction/orientation when known, evidence, blockers resolved, confidence, and assumptions.
    - Include a separate "Fact Basis" section listing the exact MCP tool results used.
    - Include "Open Risks / Needs Human Review" for ambiguous contacts, inaccessible paths, missing fastener intent, or tool confidence limits.
 
@@ -80,13 +83,18 @@ Where does the evidence stop and inference begin?
 
 ## Output format
 
-Use this compact structure unless the user asks for a different format:
+Use this structure unless the user asks for a different format:
 
 ```markdown
+**Part-Level Assembly Feature Analysis**
+| Part | Basic Assembly Features | Geometry / Contacts | Removal / Install Direction | Process Accessibility | Visual Evidence | Confidence |
+|---|---|---|---|---|---|---|
+| `part_id` / name | hole-like / shaft-like / planar mate / cylindrical mate / thread-like / cover-like / unknown | contacts, mating faces, blockers | direction or unknown | accessible / blocked / requires prior subassembly / unknown | `image_path` or none | High/Medium/Low |
+
 **Assembly Sequence**
-| Step | Part / Subassembly | Operation | Evidence | Confidence |
-|---:|---|---|---|---|
-| 1 | ... | ... | ... | High/Medium/Low |
+| Step | Part / Subassembly | Assembly Type | Operation | Evidence | Confidence |
+|---:|---|---|---|---|---|
+| 1 | ... | base placement / insertion / stacking / fastening-like / closure / subassembly join / adjustment-orientation / retention / unknown | ... | ... | High/Medium/Low |
 
 **Subassembly Strategy**
 - ...
@@ -103,6 +111,7 @@ Use this compact structure unless the user asks for a different format:
 - Main precedence constraints: ...
 - Subassemblies: ...
 - Process constraints: ...
+- Assembly type definitions used: ...
 
 **Open Risks / Human Review**
 - ...

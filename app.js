@@ -2679,6 +2679,30 @@ async function handleViewerInvoke({ id, method, params }) {
         }
         break;
       }
+      case "capturePartMultiview": {
+        console.error("[DEBUG] capturePartMultiview called, state.viewer:", !!state.viewer);
+        if (!state.viewer) {
+          result = { error: "Viewer not ready" };
+        } else if (!params?.partId) {
+          result = { error: "partId is required" };
+        } else {
+          const partResult = await state.viewer.capturePartMultiview(params.partId, {
+            size: params?.size || 256,
+            angles: params?.angles || [
+              { name: "front-1", azimuth: 0, elevation: 10 },
+              { name: "front-2", azimuth: 30, elevation: 20 },
+              { name: "front-3", azimuth: -30, elevation: 20 },
+              { name: "front-4", azimuth: 0, elevation: 35 },
+              { name: "back-1", azimuth: 180, elevation: 10 },
+              { name: "back-2", azimuth: 150, elevation: 20 },
+              { name: "back-3", azimuth: 210, elevation: 20 },
+              { name: "back-4", azimuth: 180, elevation: 35 },
+            ],
+          });
+          result = { success: true, views: partResult };
+        }
+        break;
+      }
       case "setSection": {
         if (state.viz && params) {
           if (params.enabled !== undefined) state.viz.section.enabled = params.enabled;

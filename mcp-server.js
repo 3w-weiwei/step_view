@@ -128,6 +128,17 @@ function evidenceMeta(evidence) {
   };
 }
 
+const DEFAULT_PART_MULTIVIEW = [
+  { name: "front-1", azimuth: 0, elevation: 10 },
+  { name: "front-2", azimuth: 30, elevation: 20 },
+  { name: "front-3", azimuth: -30, elevation: 20 },
+  { name: "front-4", azimuth: 0, elevation: 35 },
+  { name: "back-1", azimuth: 180, elevation: 10 },
+  { name: "back-2", azimuth: 150, elevation: 20 },
+  { name: "back-3", azimuth: 210, elevation: 20 },
+  { name: "back-4", azimuth: 180, elevation: 35 },
+];
+
 function normalizeVector(vector) {
   const values = Array.isArray(vector) ? vector.map(Number) : [0, 0, 0];
   const length = Math.hypot(values[0] || 0, values[1] || 0, values[2] || 0);
@@ -1251,6 +1262,73 @@ server.registerTool(
         label: view.label,
         azimuth: view.azimuth,
         elevation: view.elevation,
+        has_image: Boolean(view.image),
+        image_path: view.imagePath || null,
+      })),
+    }, images);
+  },
+);
+
+server.registerTool(
+  "cad_render_part_multiview",
+  {
+    title: "零件八视角渲染",
+    description: "收集指定零件的 8 张渲染图，前后各 4 张，固定 256x256，并返回图像与路径作为证据。",
+    inputSchema: ProjectIdSchema.extend({
+      part_id: z.string().describe("Part/node id, for example node-2."),
+      size: z.number().int().positive().max(1024).optional(),
+      views: z
+        .array(
+          z.object({
+            name: z.string(),
+            azimuth: z.number(),
+            elevation: z.number(),
+            label: z.string().optional(),
+          }),
+        )
+        .optional(),
+    }),
+  },
+  async ({ project_id, part_id, size, views }) => {
+    const { manifest, assembly } = await resolveProject(project_id);
+    const index = buildIndex(assembly);
+    const part = index.nodeMap.get(part_id);
+    if (!part || part.kind !== "part") {
+      throw new Error(`Part not found: ${part_id}`);
+    }
+
+    const result = await invokeViewer(
+      "capturePartMultiview",
+      {
+        partId: part_id,
+        size: size || 256,
+        angles: views || DEFAULT_PART_MULTIVIEW,
+      },
+      60000,
+    );
+    const viewsWithImages = [];
+    for (const view of result.views || []) {
+      const imagePath = await saveEvidenceImage(manifest.projectId, view.image, `${part_id}-${view.name}`);
+      viewsWithImages.push({ ...view, imagePath });
+    }
+    const images = viewsWithImages.map((view) => ({
+      image: view.image,
+      mimeType: "image/png",
+      name: view.name,
+    }));
+
+    return evidenceResult({
+      success: true,
+      project_id: manifest.projectId,
+      part: compactPart(part),
+      size: size || 256,
+      views: viewsWithImages.map((view) => ({
+        name: view.name,
+        label: view.label,
+        azimuth: view.azimuth,
+        elevation: view.elevation,
+        width: view.width || size || 256,
+        height: view.height || size || 256,
         has_image: Boolean(view.image),
         image_path: view.imagePath || null,
       })),

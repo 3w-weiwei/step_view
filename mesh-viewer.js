@@ -11,6 +11,17 @@ const VIEW_DIRECTIONS = {
   bottom: new THREE.Vector3(0, 0, -1),
 };
 
+const PART_MULTIVIEW_ANGLES = [
+  { name: "front-1", azimuth: 0, elevation: 10 },
+  { name: "front-2", azimuth: 30, elevation: 20 },
+  { name: "front-3", azimuth: -30, elevation: 20 },
+  { name: "front-4", azimuth: 0, elevation: 35 },
+  { name: "back-1", azimuth: 180, elevation: 10 },
+  { name: "back-2", azimuth: 150, elevation: 20 },
+  { name: "back-3", azimuth: 210, elevation: 20 },
+  { name: "back-4", azimuth: 180, elevation: 35 },
+];
+
 // VLM优化的面颜色调色板 - 高饱和度、高亮度、高对比度
 const FACE_PALETTE = [
   // 基础彩虹色 - 高饱和度
@@ -135,7 +146,7 @@ export class WorkbenchViewer {
     this.selection = null;
     this.state = {
       selectionMode: "part",
-      colorMode: "face", // "face" 或 "part"
+      colorMode: "part", // "face" 或 "part"
       hiddenNodeIds: new Set(),
       isolatedNodeIds: null,
       section: {
@@ -454,16 +465,11 @@ export class WorkbenchViewer {
 
     // 如果是零件级着色模式，为每个零件（mesh）分配唯一颜色
     if (this.state.colorMode === "part") {
-      const partIndex = this.meshPartColorIndexMap?.get(meshData.id) ?? 0;
-      const totalParts = this.partColorIndexMap?.size ?? 1;
-      const partColor = getFaceColor(partIndex, totalParts);
+      const partColor = this.nodeMap.get(meshData.nodeId)?.color || meshData.color || "#8aa6d1";
       console.error("[DEBUG] buildMaterials part mode:", {
         meshId: meshData.id,
         nodeId: meshData.nodeId,
-        partIndex,
-        totalParts,
         partColor,
-        mapSize: this.meshPartColorIndexMap?.size
       });
       materials[0] = createMaterial(hexToColor(partColor));
       geometry.addGroup(0, meshData.index.length * 3, 0);
@@ -611,6 +617,9 @@ export class WorkbenchViewer {
       // 重建材质
       const materials = this.buildMaterials(meshData, geometry);
       mesh.material = materials.length > 1 ? materials : materials[0];
+      record.baseColors = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((material) =>
+        material.color.clone(),
+      );
       console.error("[DEBUG] After rebuildMaterials:", {
         meshId: meshData.id,
         nodeId: meshData.nodeId,
@@ -765,9 +774,7 @@ export class WorkbenchViewer {
       }
       materials.forEach((material, index) => {
         // 只在 face 模式下恢复到 baseColors，part 模式保持当前材质颜色
-        if (this.state.colorMode !== "part") {
-          material.color.copy(record.baseColors[index] || record.baseColors[0]);
-        }
+        material.color.copy(record.baseColors[index] || record.baseColors[0]);
         material.emissive = new THREE.Color(0x000000);
         material.opacity = opacity;
         material.transparent = opacity < 0.999;
@@ -807,7 +814,10 @@ export class WorkbenchViewer {
           material.emissive = new THREE.Color(0x7f5300);
           material.emissiveIntensity = 0.35;
         } else if (hoveredFaceId === face.id) {
-          material.color.offsetHSL(0, 0, 0.08);
+          material.color.copy(record.baseColors[index] || record.baseColors[0]);
+          if (this.state.colorMode !== "part") {
+            material.color.offsetHSL(0, 0, 0.08);
+          }
           material.emissive = new THREE.Color(0x3a2b00);
           material.emissiveIntensity = 0.18;
         }
@@ -980,6 +990,129 @@ export class WorkbenchViewer {
     this.render();
 
     return snapshots;
+  }
+
+  async capturePartMultiview(partId, { size = 256, angles = PART_MULTIVIEW_ANGLES } = {}) {
+    const targetNode = this.nodeMap.get(partId);
+    if (!targetNode) {
+      throw new Error(`Part not found: ${partId}`);
+    }
+
+    const saved = {
+      width: this.canvas.width,
+      height: this.canvas.height,
+      pixelRatio: this.renderer.getPixelRatio ? this.renderer.getPixelRatio() : 1,
+      cameraPosition: this.camera.position.clone(),
+      cameraTarget: this.controls.target.clone(),
+      cameraUp: this.camera.up.clone(),
+      zoom: this.camera.zoom,
+      near: this.camera.near,
+      far: this.camera.far,
+      selection: this.selection,
+      hovered: this.hovered,
+      hiddenNodeIds: new Set(this.state.hiddenNodeIds),
+      isolatedNodeIds: this.state.isolatedNodeIds ? new Set(this.state.isolatedNodeIds) : null,
+      colorMode: this.state.colorMode,
+      section: { ...this.state.section },
+      transparencyLevels: new Map(this.state.transparencyLevels),
+      fadeOthers: this.state.fadeOthers
+        ? { partIds: new Set(this.state.fadeOthers.partIds), level: this.state.fadeOthers.level }
+        : null,
+      highlightedFaces: new Map(this.state.highlightedFaces),
+      explodedView: this.state.explodedView ? { ...this.state.explodedView } : null,
+      partTransforms: new Map(this.state.partTransforms),
+    };
+
+    const bounds = this.sceneData?.bounds;
+    const center = bounds
+      ? new THREE.Vector3(bounds.center.x, bounds.center.y, bounds.center.z)
+      : new THREE.Vector3();
+    const sizeVec = bounds
+      ? new THREE.Vector3(bounds.size.x, bounds.size.y, bounds.size.z)
+      : new THREE.Vector3(100, 100, 100);
+    const radius = Math.max(sizeVec.length() * 0.55, 20);
+    const results = [];
+
+    try {
+      this.state.colorMode = "part";
+      this.rebuildMaterials();
+
+      this.canvas.width = size;
+      this.canvas.height = size;
+      this.renderer.setPixelRatio(1);
+      this.renderer.setSize(size, size, false);
+      this.camera.aspect = 1;
+      this.camera.updateProjectionMatrix();
+
+      this.state.hiddenNodeIds = new Set();
+      this.state.isolatedNodeIds = new Set([partId]);
+      this.state.section = { enabled: false, axis: "x", offset: 0 };
+      this.state.transparencyLevels = new Map();
+      this.state.fadeOthers = null;
+      this.state.highlightedFaces = new Map();
+      this.state.explodedView = null;
+      this.state.partTransforms = new Map();
+      this.setSelection({ selectionType: "part", nodeId: partId, label: targetNode.name });
+      this.hovered = null;
+      this.applyVisualState();
+
+      for (const angle of angles) {
+        const azimuth = Number(angle.azimuth) || 0;
+        const elevation = Number(angle.elevation) || 0;
+        const theta = THREE.MathUtils.degToRad(azimuth);
+        const phi = THREE.MathUtils.degToRad(elevation);
+        const direction = new THREE.Vector3(
+          Math.cos(phi) * Math.cos(theta),
+          Math.cos(phi) * Math.sin(theta),
+          Math.sin(phi),
+        ).normalize();
+        this.controls.target.copy(center);
+        this.camera.position.copy(center.clone().addScaledVector(direction, radius * 2.2));
+        this.camera.up.set(0, 0, 1);
+        this.controls.update();
+        this.render();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        const canvas = this.renderer.domElement;
+        results.push({
+          name: angle.name,
+          label: angle.label || angle.name,
+          azimuth,
+          elevation,
+          width: size,
+          height: size,
+          image: canvas.toDataURL("image/png").split(",")[1] || null,
+          mimeType: "image/png",
+        });
+      }
+
+      return results;
+    } finally {
+      this.canvas.width = saved.width;
+      this.canvas.height = saved.height;
+      this.renderer.setPixelRatio(saved.pixelRatio);
+      this.renderer.setSize(saved.width, saved.height, false);
+      this.camera.position.copy(saved.cameraPosition);
+      this.controls.target.copy(saved.cameraTarget);
+      this.camera.up.copy(saved.cameraUp);
+      this.camera.zoom = saved.zoom;
+      this.camera.near = saved.near;
+      this.camera.far = saved.far;
+      this.camera.updateProjectionMatrix();
+      this.selection = saved.selection;
+      this.hovered = saved.hovered;
+      this.state.hiddenNodeIds = saved.hiddenNodeIds;
+      this.state.isolatedNodeIds = saved.isolatedNodeIds;
+      this.state.colorMode = saved.colorMode;
+      this.state.section = saved.section;
+      this.state.transparencyLevels = saved.transparencyLevels;
+      this.state.fadeOthers = saved.fadeOthers;
+      this.state.highlightedFaces = saved.highlightedFaces;
+      this.state.explodedView = saved.explodedView;
+      this.state.partTransforms = saved.partTransforms;
+      this.rebuildMaterials();
+      this.controls.update();
+      this.render();
+    }
   }
 }
 

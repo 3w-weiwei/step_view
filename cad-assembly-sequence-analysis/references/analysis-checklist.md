@@ -7,6 +7,7 @@ Use this checklist for complex assemblies or low-confidence cases.
 - Model summary loaded and part count known.
 - Assembly tree inspected for hierarchy and repeated components.
 - Parts list inspected for names, IDs, visibility, bounding boxes, and likely roles.
+- Each important part has a concise assembly feature row based on evidence, not guessed product categories.
 - Contact pairs collected, with candidates checked when exact contacts look incomplete.
 - Critical mating faces inspected with face details or highlighted render.
 - Removal directions analyzed for each non-base part or subassembly.
@@ -22,6 +23,8 @@ Use this checklist for complex assemblies or low-confidence cases.
 ## Mechanical heuristics
 
 - Treat a large grounded body, frame, base plate, housing half, or enclosure as the likely assembly base only after checking contacts and containment.
+- Describe basic assembly features before naming functions: hole-like, shaft-like, planar mate, cylindrical mate, slot-like, thread-like, cover-like, locating-like, retention-like, or unknown.
+- Mark thread-like features as uncertain unless helical geometry, naming, repeated circular fastener-like contacts, or visual evidence supports the claim.
 - Prefer installing internal parts before covers, caps, housing closures, retaining plates, or parts that block later access.
 - Prefer completing independent internal modules as subassemblies before installing them into the main housing when the module has dense internal contacts and a feasible insertion/removal direction.
 - Prefer installing locating features, seats, rails, bearings, bushings, spacers, and supports before parts that depend on them.
@@ -42,6 +45,22 @@ Use this checklist for complex assemblies or low-confidence cases.
 - If two parts only contact the same base and not each other, their relative order is probably unconstrained unless access or blockers say otherwise.
 - If a cluster of parts has many mutual contacts and one or two external interfaces, treat it as a candidate subassembly and verify its insertion into the parent assembly.
 - If a cover, cap, housing half, plate, or retaining ring blocks visual or geometric access to internal contacts, schedule it after the internal components it encloses.
+
+## Assembly type labels
+
+Use these labels in the assembly sequence:
+
+- `base placement`: establish the initial reference/base object.
+- `subassembly build`: assemble a dense internal cluster before main installation.
+- `subassembly join`: install a completed subassembly into the parent assembly.
+- `linear insertion`: install along a supported straight clearance direction.
+- `axial insertion`: install a shaft-like, pin-like, or cylindrical-contact part along its axis.
+- `planar mating`: place a part onto a planar face or seating surface.
+- `fastening-like`: install a part that appears to constrain two or more already-positioned parts. Use cautious wording.
+- `retention`: install a part that appears to prevent later removal or hold position.
+- `closure`: install a cover/cap/housing/plate-like part that blocks access or encloses internals.
+- `adjustment-orientation`: orient or align a part where direction is plausible but contact evidence is incomplete.
+- `unknown`: use when evidence does not support a more specific process label.
 
 ## Confidence labels
 
