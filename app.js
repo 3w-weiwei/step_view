@@ -65,6 +65,24 @@ const viewerState = {
   currentRoute: null,
 };
 
+function captureCanvasDataUrl(canvas, maxSize = 640) {
+  const sourceWidth = canvas.width || canvas.clientWidth || 1;
+  const sourceHeight = canvas.height || canvas.clientHeight || 1;
+  const largest = Math.max(sourceWidth, sourceHeight);
+  if (!maxSize || largest <= maxSize) {
+    return canvas.toDataURL("image/png");
+  }
+  const scale = maxSize / largest;
+  const targetWidth = Math.max(1, Math.round(sourceWidth * scale));
+  const targetHeight = Math.max(1, Math.round(sourceHeight * scale));
+  const output = document.createElement("canvas");
+  output.width = targetWidth;
+  output.height = targetHeight;
+  const context = output.getContext("2d");
+  context.drawImage(canvas, 0, 0, targetWidth, targetHeight);
+  return output.toDataURL("image/png");
+}
+
 if (!api) {
   root.innerHTML = `
     <div class="loading-state">
@@ -2582,7 +2600,8 @@ async function handleViewerInvoke({ id, method, params }) {
             params.azimuth ?? 45,
             params.elevation ?? 30,
             params.distance ?? 200,
-            params.roll ?? 0
+            params.roll ?? 0,
+            params.targetBBox || params.target_bbox || null
           );
         }
         result = { success: true };
@@ -2619,7 +2638,8 @@ async function handleViewerInvoke({ id, method, params }) {
           console.error("[DEBUG] captureScreenshot: canvas not found");
           result = { error: "Canvas not found" };
         } else {
-          const dataUrl = canvas.toDataURL("image/png");
+          const maxSize = Math.max(128, Math.min(2048, Number(params?.maxSize || params?.max_size || 640)));
+          const dataUrl = captureCanvasDataUrl(canvas, maxSize);
           console.error("[DEBUG] captureScreenshot success, length:", dataUrl.length);
           result = {
             success: true,
@@ -2654,17 +2674,19 @@ async function handleViewerInvoke({ id, method, params }) {
               angle.azimuth,
               angle.elevation,
               angle.distance || savedParams.distance,
-              0
+              0,
+              angle.targetBBox || angle.target_bbox || null
             );
             // Use setTimeout instead of requestAnimationFrame for reliability
             await new Promise((r) => setTimeout(r, 50));
             const canvas = document.getElementById("viewer-canvas");
+            const maxSize = Math.max(128, Math.min(2048, Number(params?.maxSize || params?.max_size || 640)));
             results.push({
               name: angle.name,
               label: angle.label || angle.name,
               azimuth: angle.azimuth,
               elevation: angle.elevation,
-              image: canvas?.toDataURL("image/png")?.split(",")[1] || null,
+              image: canvas ? captureCanvasDataUrl(canvas, maxSize).split(",")[1] : null,
             });
             console.error("[DEBUG] Captured angle:", angle.name);
           }
@@ -2688,6 +2710,8 @@ async function handleViewerInvoke({ id, method, params }) {
         } else {
           const partResult = await state.viewer.capturePartMultiview(params.partId, {
             size: params?.size || 256,
+            isolatePartIds: params?.isolatePartIds || params?.isolate_part_ids || null,
+            highlights: params?.highlights || null,
             angles: params?.angles || [
               { name: "front-1", azimuth: 0, elevation: 10 },
               { name: "front-2", azimuth: 30, elevation: 20 },

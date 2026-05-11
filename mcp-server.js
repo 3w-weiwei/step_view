@@ -185,6 +185,50 @@ function bboxGap(left, right) {
   return Math.hypot(dx, dy, dz);
 }
 
+function unionBBoxes(items) {
+  const boxes = items.map((item) => item?.bbox || item?.bounds).filter(Boolean);
+  if (!boxes.length) {
+    return null;
+  }
+  const min = {
+    x: Math.min(...boxes.map((box) => box.min.x)),
+    y: Math.min(...boxes.map((box) => box.min.y)),
+    z: Math.min(...boxes.map((box) => box.min.z)),
+  };
+  const max = {
+    x: Math.max(...boxes.map((box) => box.max.x)),
+    y: Math.max(...boxes.map((box) => box.max.y)),
+    z: Math.max(...boxes.map((box) => box.max.z)),
+  };
+  return {
+    min,
+    max,
+    center: {
+      x: (min.x + max.x) / 2,
+      y: (min.y + max.y) / 2,
+      z: (min.z + max.z) / 2,
+    },
+    size: {
+      x: max.x - min.x,
+      y: max.y - min.y,
+      z: max.z - min.z,
+    },
+  };
+}
+
+function translateBBox(bbox, vector) {
+  if (!bbox) {
+    return null;
+  }
+  const [x, y, z] = vector || [0, 0, 0];
+  return {
+    min: { x: bbox.min.x + x, y: bbox.min.y + y, z: bbox.min.z + z },
+    max: { x: bbox.max.x + x, y: bbox.max.y + y, z: bbox.max.z + z },
+    center: { x: bbox.center.x + x, y: bbox.center.y + y, z: bbox.center.z + z },
+    size: { ...bbox.size },
+  };
+}
+
 function bboxOverlapRatio(left, right) {
   const a = left?.bounds || left?.bbox;
   const b = right?.bounds || right?.bbox;
@@ -268,6 +312,79 @@ function viewFromDirection(direction, distance) {
     elevation: round(Math.max(-75, Math.min(75, elevation)), 1),
     distance,
   };
+}
+
+function distanceForBBox(bbox, multiplier = 2.0) {
+  const size = bbox?.size || { x: 100, y: 100, z: 100 };
+  return Math.max(Math.hypot(size.x || 0, size.y || 0, size.z || 0) * multiplier, 80);
+}
+
+function buildEvidenceViews(bbox, prefix = "evidence") {
+  const distance = distanceForBBox(bbox, 2.15);
+  return [
+    { name: `${prefix}-iso`, azimuth: 45, elevation: 30, distance },
+    { name: `${prefix}-front`, azimuth: 0, elevation: 0, distance },
+    { name: `${prefix}-right`, azimuth: -90, elevation: 0, distance },
+    { name: `${prefix}-top`, azimuth: 0, elevation: 70, distance },
+    { name: `${prefix}-low-iso`, azimuth: 45, elevation: -25, distance },
+  ];
+}
+
+function sectionOffsetsForBBox(bbox, axis, count = 5) {
+  const key = axis || "x";
+  if (!bbox?.min || !bbox?.max) {
+    return [0];
+  }
+  const min = bbox.min[key];
+  const max = bbox.max[key];
+  const span = max - min;
+  if (!Number.isFinite(span) || span <= 1e-6 || count <= 1) {
+    return [bbox.center?.[key] ?? 0];
+  }
+  return Array.from({ length: count }, (_, index) => round(min + (span * (index + 1)) / (count + 1), 4));
+}
+
+function transformedAssemblyBBox(index, transforms) {
+  const boxes = index.parts
+    .map((part) => translateBBox(part.bbox, transforms?.[part.id] || [0, 0, 0]))
+    .filter(Boolean);
+  return unionBBoxes(boxes);
+}
+
+function buildContactPairList(index, options = {}) {
+  const pairs = [];
+  const seen = new Set();
+  const parts = options.partId ? [index.nodeMap.get(options.partId)].filter(Boolean) : index.parts;
+
+  for (const part of parts) {
+    if (!part || part.kind !== "part") {
+      continue;
+    }
+    const candidates = buildContactCandidates(part, index, {
+      maxDistance: options.maxDistance,
+      minConfidence: options.minConfidence,
+      maxPairs: options.maxPairs || 200,
+      maxFacePairsPerPart: options.maxFacePairsPerPart || 8,
+    });
+    for (const candidate of candidates) {
+      const key = [part.id, candidate.other_part_id].sort().join("::");
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      pairs.push({
+        pair_id: key,
+        part_a: { id: part.id, name: part.name },
+        part_b: { id: candidate.other_part_id, name: candidate.other_part_name },
+        confidence: candidate.confidence,
+        relation_type: candidate.relation_type,
+        contact_faces: candidate.face_pairs,
+      });
+    }
+  }
+
+  pairs.sort((a, b) => b.confidence - a.confidence);
+  return pairs;
 }
 
 function humanViewForTarget(target, assembly, options = {}) {
@@ -504,6 +621,12 @@ function buildContactCandidates(part, index, options = {}) {
 function analyzeDirection(part, index, directionInput) {
   const direction = normalizeVector(directionInput);
   const sourceInterval = projectBBoxInterval(part.bbox, direction);
+  const contactCandidates = buildContactCandidates(part, index, {
+    maxPairs: 100,
+    maxFacePairsPerPart: 3,
+    minConfidence: 0.18,
+  });
+  const contactByPart = new Map(contactCandidates.map((candidate) => [candidate.other_part_id, candidate]));
   const blockingParts = [];
 
   for (const otherPart of index.parts) {
@@ -519,26 +642,33 @@ function analyzeDirection(part, index, directionInput) {
     if (crossSectionOverlap <= 0.01) {
       continue;
     }
-    const confidence = round(Math.min(1, crossSectionOverlap * (1 / (1 + Math.max(0, aheadDistance) / 100)) * 1.25), 4);
+    const contact = contactByPart.get(otherPart.id);
+    const proximity = Math.max(0, 1 / (1 + Math.max(0, aheadDistance) / 100));
+    const contactWeight = contact ? Math.max(0.35, contact.confidence) : 0.2;
+    const confidence = round(Math.min(1, crossSectionOverlap * proximity * (0.75 + contactWeight)), 4);
     blockingParts.push({
       part_id: otherPart.id,
       part_name: otherPart.name,
       distance_along_direction: round(aheadDistance),
       cross_section_overlap: crossSectionOverlap,
       confidence,
+      has_contact_or_near_face_evidence: Boolean(contact),
+      contact_confidence: contact?.confidence || 0,
     });
   }
 
   blockingParts.sort((a, b) => a.distance_along_direction - b.distance_along_direction || b.confidence - a.confidence);
   const strongest = blockingParts[0]?.confidence || 0;
+  const strongBlockers = blockingParts.filter((blocker) => blocker.confidence > 0.12 || blocker.has_contact_or_near_face_evidence);
   return {
     direction,
-    result: blockingParts.length && strongest > 0.08 ? "blocked" : "clear",
-    confidence: blockingParts.length ? strongest : 0.6,
+    result: strongBlockers.length ? "blocked" : blockingParts.length ? "probably_clear_bbox_only_overlap" : "clear",
+    confidence: strongBlockers.length ? strongest : blockingParts.length ? Math.min(strongest, 0.35) : 0.6,
     blocking_parts: blockingParts.slice(0, 12),
-    method: "swept_bbox_projection_heuristic",
+    method: "swept_bbox_projection_with_near_face_weighting",
     limitations: [
-      "This is a conservative geometric heuristic, not an exact motion-planning or CAD-kernel collision result.",
+      "This is still a conservative heuristic, not an exact CAD-kernel collision or motion-planning result.",
+      "BBox-only blockers without contact or near-face evidence should be treated as weak candidates, especially for holes, concave parts, and sparse geometry.",
       "Fasteners, threads, press fits, and assembly constraints are not inferred unless visible in geometry.",
     ],
   };
@@ -684,7 +814,7 @@ async function syncViewerVisualState(projectId) {
   await invokeViewer("setSection", viewState.section);
 }
 
-async function captureViewerEvidence(projectId, view = {}) {
+async function captureViewerEvidence(projectId, view = {}, options = {}) {
   await syncViewerVisualState(projectId);
   if (view.preset && VIEW_PRESETS[view.preset]) {
     const preset = VIEW_PRESETS[view.preset];
@@ -693,6 +823,7 @@ async function captureViewerEvidence(projectId, view = {}) {
       elevation: preset.elevation,
       distance: view.distance,
       roll: view.roll || 0,
+      targetBBox: view.target_bbox,
     });
   } else if (view.azimuth !== undefined || view.elevation !== undefined || view.distance !== undefined) {
     const current = await invokeViewer("getCamera").catch(() => ({ params: {} }));
@@ -701,12 +832,13 @@ async function captureViewerEvidence(projectId, view = {}) {
       elevation: view.elevation ?? current.params?.elevation ?? 30,
       distance: view.distance ?? current.params?.distance ?? 200,
       roll: view.roll ?? current.params?.roll ?? 0,
+      targetBBox: view.target_bbox,
     });
   } else {
     await invokeViewer("fit");
   }
   await new Promise((resolve) => setTimeout(resolve, 80));
-  const screenshot = await invokeViewer("captureScreenshot", {}, 30000);
+  const screenshot = await invokeViewer("captureScreenshot", { maxSize: options.imageMaxSize || view.image_max_size || 640 }, 30000);
   const camera = await invokeViewer("getCamera").catch(() => null);
   const rawImage = screenshot?.image || "";
   const image = rawImage.startsWith("data:image") ? rawImage.split(",")[1] : rawImage;
@@ -739,6 +871,8 @@ const ViewSchema = z.object({
   elevation: z.number().optional(),
   distance: z.number().optional(),
   roll: z.number().optional(),
+  target_bbox: z.any().optional(),
+  image_max_size: z.number().int().positive().max(2048).optional(),
 }).optional();
 
 const server = new McpServer(
@@ -946,45 +1080,32 @@ server.registerTool(
       max_distance: z.number().nonnegative().optional(),
       min_confidence: z.number().min(0).max(1).optional(),
       max_pairs: z.number().int().positive().optional(),
+      compact: z.boolean().optional(),
+      max_face_pairs: z.number().int().positive().optional(),
     }),
   },
-  async ({ project_id, part_id, max_distance, min_confidence, max_pairs }) => {
+  async ({ project_id, part_id, max_distance, min_confidence, max_pairs, compact, max_face_pairs }) => {
     const { manifest, assembly } = await resolveProject(project_id);
     const index = buildIndex(assembly);
-    const pairs = [];
-    const seen = new Set();
-    const parts = part_id ? [index.nodeMap.get(part_id)].filter(Boolean) : index.parts;
-
-    for (const part of parts) {
-      if (!part || part.kind !== "part") {
-        continue;
-      }
-      const candidates = buildContactCandidates(part, index, {
-        maxDistance: max_distance,
-        minConfidence: min_confidence,
-        maxPairs: max_pairs || 200,
-      });
-      for (const candidate of candidates) {
-        const key = [part.id, candidate.other_part_id].sort().join("::");
-        if (seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-        pairs.push({
-          part_a: { id: part.id, name: part.name },
-          part_b: { id: candidate.other_part_id, name: candidate.other_part_name },
-          confidence: candidate.confidence,
-          relation_type: candidate.relation_type,
-          contact_faces: candidate.face_pairs,
-        });
-      }
-    }
-
-    pairs.sort((a, b) => b.confidence - a.confidence);
+    const pairs = buildContactPairList(index, {
+      partId: part_id,
+      maxDistance: max_distance,
+      minConfidence: min_confidence,
+      maxPairs: max_pairs || 200,
+      maxFacePairsPerPart: max_face_pairs || (compact ? 2 : 8),
+    });
     return textResult({
       project_id: manifest.projectId,
       method: "bbox_normal_area_heuristic",
-      contact_pairs: pairs.slice(0, max_pairs || 50),
+      contact_pairs: pairs.slice(0, max_pairs || 50).map((pair) => compact ? {
+        pair_id: pair.pair_id,
+        part_a: pair.part_a,
+        part_b: pair.part_b,
+        confidence: pair.confidence,
+        relation_type: pair.relation_type,
+        face_pair_count: pair.contact_faces.length,
+        top_face_pairs: pair.contact_faces.slice(0, max_face_pairs || 2),
+      } : pair),
     });
   },
 );
@@ -1337,6 +1458,117 @@ server.registerTool(
 );
 
 server.registerTool(
+  "cad_render_contact_pair_multiview",
+  {
+    title: "Render contact pair multiview",
+    description: "Isolates two connected parts, highlights their candidate contact faces in red, and captures 8 multiview images for VLM-friendly contact analysis.",
+    inputSchema: ProjectIdSchema.extend({
+      pair_id: z.string().optional().describe("Pair id from cad_get_contact_pairs compact output, formatted like node-2::node-3."),
+      part_a_id: z.string().optional(),
+      part_b_id: z.string().optional(),
+      max_distance: z.number().nonnegative().optional(),
+      min_confidence: z.number().min(0).max(1).optional(),
+      max_face_pairs: z.number().int().positive().max(16).optional(),
+      size: z.number().int().positive().max(1024).optional(),
+      views: z
+        .array(
+          z.object({
+            name: z.string(),
+            azimuth: z.number(),
+            elevation: z.number(),
+            label: z.string().optional(),
+          }),
+        )
+        .optional(),
+    }),
+  },
+  async ({ project_id, pair_id, part_a_id, part_b_id, max_distance, min_confidence, max_face_pairs, size, views }) => {
+    const { manifest, assembly } = await resolveProject(project_id);
+    const index = buildIndex(assembly);
+    const pairs = buildContactPairList(index, {
+      partId: part_a_id,
+      maxDistance: max_distance,
+      minConfidence: min_confidence,
+      maxPairs: 200,
+      maxFacePairsPerPart: max_face_pairs || 8,
+    });
+    const normalizedPairId = pair_id || (part_a_id && part_b_id ? [part_a_id, part_b_id].sort().join("::") : null);
+    const pair = normalizedPairId
+      ? pairs.find((item) => item.pair_id === normalizedPairId)
+      : pairs[0];
+    if (!pair) {
+      throw new Error("Contact pair not found. Provide pair_id or part_a_id + part_b_id from cad_get_contact_pairs.");
+    }
+    if (part_b_id && ![pair.part_a.id, pair.part_b.id].includes(part_b_id)) {
+      throw new Error(`Contact pair not found for ${part_a_id} and ${part_b_id}.`);
+    }
+
+    const facePairs = pair.contact_faces.slice(0, max_face_pairs || 8);
+    const highlights = {};
+    for (const facePair of facePairs) {
+      if (facePair.face_id) {
+        highlights[facePair.face_id] = "#ff2b2b";
+      }
+      if (facePair.other_face_id) {
+        highlights[facePair.other_face_id] = "#ff2b2b";
+      }
+    }
+
+    const result = await invokeViewer(
+      "capturePartMultiview",
+      {
+        partId: pair.part_a.id,
+        isolatePartIds: [pair.part_a.id, pair.part_b.id],
+        highlights,
+        size: size || 256,
+        angles: views || DEFAULT_PART_MULTIVIEW,
+      },
+      60000,
+    );
+    const viewsWithImages = [];
+    for (const view of result.views || []) {
+      const imagePath = await saveEvidenceImage(manifest.projectId, view.image, `${pair.pair_id}-${view.name}`);
+      viewsWithImages.push({ ...view, imagePath });
+    }
+    const images = viewsWithImages.map((view) => ({
+      image: view.image,
+      mimeType: "image/png",
+      name: view.name,
+    }));
+
+    return evidenceResult({
+      success: true,
+      project_id: manifest.projectId,
+      method: "bbox_normal_area_heuristic_visualized",
+      pair: {
+        pair_id: pair.pair_id,
+        part_a: pair.part_a,
+        part_b: pair.part_b,
+        confidence: pair.confidence,
+        relation_type: pair.relation_type,
+        highlighted_face_count: Object.keys(highlights).length,
+        face_pairs: facePairs,
+      },
+      render_state: {
+        isolated_part_ids: [pair.part_a.id, pair.part_b.id],
+        highlight_color: "#ff2b2b",
+        size: size || 256,
+      },
+      views: viewsWithImages.map((view) => ({
+        name: view.name,
+        label: view.label,
+        azimuth: view.azimuth,
+        elevation: view.elevation,
+        width: view.width || size || 256,
+        height: view.height || size || 256,
+        has_image: Boolean(view.image),
+        image_path: view.imagePath || null,
+      })),
+    }, images);
+  },
+);
+
+server.registerTool(
   "cad_render_view",
   {
     title: "渲染单视角证据图",
@@ -1568,16 +1800,18 @@ server.registerTool(
     const { manifest, assembly } = await resolveProject(project_id);
     const index = buildIndex(assembly);
     const { transforms, plan } = computeDisassemblyTransforms(index, assembly, factor || 1);
+    const explodedBounds = transformedAssemblyBBox(index, transforms) || assembly?.bounds;
     viewState.projectId = manifest.projectId;
     viewState.section = { enabled: false, axis: "x", offset: 0 };
     viewState.explodedView = null;
     viewState.partTransforms = new Map(Object.entries(transforms));
-    const evidence = await captureViewerEvidence(manifest.projectId, view || { preset: "iso" });
+    const evidence = await captureViewerEvidence(manifest.projectId, view || { ...buildEvidenceViews(explodedBounds, "exploded")[0], target_bbox: explodedBounds });
     return evidenceResult({
       success: true,
       project_id: manifest.projectId,
       strategy: "clearance_direction_plus_outward_layout",
       transform_count: Object.keys(transforms).length,
+      exploded_bounds: explodedBounds,
       plan,
       evidence: { ...evidenceMeta(evidence), auto_view_used: !view },
     }, [evidence]);
@@ -1606,6 +1840,107 @@ server.registerTool(
       part: compactPart(part),
       analyses: findClearanceDirections(part, index, directionList),
     });
+  },
+);
+
+server.registerTool(
+  "cad_collect_visual_evidence",
+  {
+    title: "Collect robust CAD visual evidence",
+    description: "Captures serial visual evidence with multiview, optional section sweeps, and optional disassembly exploded layout using camera distances fitted to the relevant or transformed bounds.",
+    inputSchema: ProjectIdSchema.extend({
+      part_ids: z.array(z.string()).optional(),
+      mode: z.enum(["overview", "section_sweep", "exploded", "part_focus"]).optional(),
+      section_axis: z.enum(["x", "y", "z"]).optional(),
+      section_offsets: z.array(z.number()).optional(),
+      exploded_factor: z.number().positive().optional(),
+      image_max_size: z.number().int().positive().max(2048).optional(),
+      views: z.array(z.object({
+        name: z.string(),
+        azimuth: z.number(),
+        elevation: z.number(),
+        distance: z.number().optional(),
+        label: z.string().optional(),
+      })).optional(),
+      transparency_level: z.number().min(0).max(1).optional(),
+    }),
+  },
+  async ({ project_id, part_ids, mode, section_axis, section_offsets, exploded_factor, image_max_size, views, transparency_level }) => {
+    const { manifest, assembly } = await resolveProject(project_id);
+    const index = buildIndex(assembly);
+    const selectedParts = (part_ids?.length ? part_ids : []).map((id) => index.nodeMap.get(id)).filter((part) => part?.kind === "part");
+    const targetBounds = unionBBoxes(selectedParts.length ? selectedParts : index.parts) || assembly?.bounds;
+    const captureMode = mode || "overview";
+    const captures = [];
+    const images = [];
+
+    viewState.projectId = manifest.projectId;
+    viewState.colorMode = "part";
+    viewState.highlightedFaces.clear();
+    viewState.transparency.clear();
+    viewState.section = { enabled: false, axis: "x", offset: 0 };
+    viewState.explodedView = null;
+    viewState.partTransforms.clear();
+
+    if (transparency_level !== undefined && selectedParts.length) {
+      for (const part of index.parts) {
+        if (!selectedParts.some((selected) => selected.id === part.id)) {
+          viewState.transparency.set(part.id, transparency_level);
+        }
+      }
+    }
+
+    let framingBounds = targetBounds;
+    if (captureMode === "exploded") {
+      const { transforms } = computeDisassemblyTransforms(index, assembly, exploded_factor || 1);
+      viewState.partTransforms = new Map(Object.entries(transforms));
+      framingBounds = transformedAssemblyBBox(index, transforms) || targetBounds;
+    }
+
+    const captureViews = views?.length ? views.map((view) => ({
+      ...view,
+      distance: view.distance || distanceForBBox(framingBounds, 2.15),
+      target_bbox: framingBounds,
+    })) : buildEvidenceViews(framingBounds, captureMode).map((view) => ({ ...view, target_bbox: framingBounds }));
+
+    if (captureMode === "section_sweep") {
+      const axis = section_axis || "x";
+      const offsets = section_offsets?.length ? section_offsets : sectionOffsetsForBBox(targetBounds, axis, 3);
+      for (const offset of offsets) {
+        viewState.section = { enabled: true, axis, offset };
+        const sweepViews = captureViews.slice(0, Math.min(2, captureViews.length));
+        for (const view of sweepViews) {
+          const namedView = { ...view, name: `${view.name}-${axis}${String(offset).replace(/[^0-9.-]/g, "_")}` };
+          const evidence = await captureViewerEvidence(manifest.projectId, namedView, { imageMaxSize: image_max_size || 480 });
+          captures.push({ mode: captureMode, section: { ...viewState.section }, evidence: evidenceMeta(evidence) });
+          images.push(evidence);
+        }
+      }
+    } else {
+      for (const view of captureViews) {
+        const evidence = await captureViewerEvidence(manifest.projectId, view, { imageMaxSize: image_max_size || 480 });
+        captures.push({ mode: captureMode, evidence: evidenceMeta(evidence) });
+        images.push(evidence);
+      }
+    }
+
+    return evidenceResult({
+      success: true,
+      project_id: manifest.projectId,
+      mode: captureMode,
+      target_part_ids: selectedParts.map((part) => part.id),
+      target_bounds: targetBounds,
+      framing_bounds: framingBounds,
+      captures: captures.map((capture) => ({
+        ...capture,
+        evidence: {
+          ...capture.evidence,
+          has_image: capture.evidence.has_image,
+          image_path: capture.evidence.image_path,
+        },
+      })),
+      recommendation: "Use at least one overview/exploded capture plus a section_sweep for hidden interfaces; cite only captures with has_image=true and inspect image_path before treating them as visual proof.",
+    }, images);
   },
 );
 

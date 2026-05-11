@@ -13,12 +13,15 @@ Use this checklist for complex assemblies or low-confidence cases.
 - Removal directions analyzed for each non-base part or subassembly.
 - Clearance directions checked for blocked or ambiguous parts.
 - Move previews rendered for at least the most consequential extraction directions.
+- Each assembly step has at least one valid visual evidence artifact, preferably from `cad_render_contact_pair_multiview`, `cad_render_move_preview`, `cad_collect_visual_evidence`, or targeted section rendering.
+- For each step, the best visual evidence was selected from candidates instead of citing all returned images.
 - Section views rendered for hidden interfaces, nested parts, or enclosure contacts.
 - Every cited visual render has `has_image: true` or a non-empty `image_path`.
 - If the LangChain client only exposes text JSON, use returned `image_path` files as the visual evidence artifacts.
 - Visual tools were called serially, not in parallel.
 - Viewer state was reset or explicitly rebuilt before each independent visual investigation.
 - Each visual capture records the intended state: color mode, transparency, highlights, section, exploded/move transform, selected parts, and camera/view preset.
+- Best-view selection checked: highlighted/contact faces visible, relevant parts isolated or context transparent, insertion/removal direction visible, low occlusion, complete framing, and clean viewer state.
 
 ## Mechanical heuristics
 
@@ -68,6 +71,7 @@ Use these labels in the assembly sequence:
 - Medium: supported by two evidence types, or one strong tool result plus mechanically plausible geometry.
 - Low: supported mainly by naming, weak contact candidates, incomplete visual evidence, or unresolved blockers.
 - Do not assign High confidence to a step that lacks visual evidence when the interface is hidden, enclosed, or ambiguous.
+- Do not assign High confidence to any assembly step unless it has valid visual evidence plus supporting data evidence.
 
 ## Required caveats
 

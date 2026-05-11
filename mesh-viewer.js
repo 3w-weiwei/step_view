@@ -1,4 +1,4 @@
-import * as THREE from "three";
+﻿import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const VIEW_DIRECTIONS = {
@@ -22,29 +22,29 @@ const PART_MULTIVIEW_ANGLES = [
   { name: "back-4", azimuth: 180, elevation: 35 },
 ];
 
-// VLM优化的面颜色调色板 - 高饱和度、高亮度、高对比度
+// VLM浼樺寲鐨勯潰棰滆壊璋冭壊锟?- 楂橀ケ鍜屽害銆侀珮浜害銆侀珮瀵规瘮锟?
 const FACE_PALETTE = [
-  // 基础彩虹色 - 高饱和度
+  // 鍩虹褰╄櫣锟?- 楂橀ケ鍜屽害
   "#FF4444", "#FF8C00", "#FFD700", "#7FFF00", "#00FF7F", "#00FFFF", "#007FFF", "#4444FF", "#8B00FF", "#FF00FF",
-  // 额外的鲜艳色彩
+  // 棰濆鐨勯矞鑹宠壊锟?
   "#FF6B6B", "#FFA502", "#FFFA65", "#A8E063", "#26DE81", "#2BCFE7", "#4B7BEC", "#845EC2", "#D65DB1", "#FF6F91",
-  // 金属感强的高对比色
+  // 閲戝睘鎰熷己鐨勯珮瀵规瘮锟?
   "#E74C3C", "#F39C12", "#F1C40F", "#2ECC71", "#1ABC9C", "#3498DB", "#9B59B6", "#E91E63", "#00BCD4", "#CDDC39",
-  // 更多高饱和度颜色
+  // 鏇村楂橀ケ鍜屽害棰滆壊
   "#FF1744", "#FF9100", "#FFEA00", "#00E676", "#00B0FF", "#651FFF", "#D500F9", "#FF4081", "#18FFFF", "#C6FF00",
   "#F50057", "#FF3D00", "#FFD600", "#1DE9B6", "#2979FF", "#6200EA", "#AA00FF", "#FF80AB", "#84FFFF", "#EEFF41",
 ];
 
 function getFaceColor(faceIndex, totalFaces) {
-  // 使用高对比度的颜色分布策略
+  // 浣跨敤楂樺姣斿害鐨勯鑹插垎甯冪瓥锟?
   if (totalFaces <= FACE_PALETTE.length) {
-    // 面数较少时，直接使用调色板中的颜色
+    // 闈㈡暟杈冨皯鏃讹紝鐩存帴浣跨敤璋冭壊鏉夸腑鐨勯锟?
     return FACE_PALETTE[faceIndex % FACE_PALETTE.length];
   }
-  // 面数较多时，使用HSL生成高饱和度高亮度的颜色
-  const hue = (faceIndex * 137.508) % 360; // 黄金角分布，确保颜色均匀分布
-  const saturation = 85 + (faceIndex % 15); // 85-100%饱和度
-  const lightness = 50 + (faceIndex % 15);  // 50-65%亮度
+  // 闈㈡暟杈冨鏃讹紝浣跨敤HSL鐢熸垚楂橀ケ鍜屽害楂樹寒搴︾殑棰滆壊
+  const hue = (faceIndex * 137.508) % 360; // 榛勯噾瑙掑垎甯冿紝纭繚棰滆壊鍧囧寑鍒嗗竷
+  const saturation = 85 + (faceIndex % 15); // 85-100%楗卞拰锟?
+  const lightness = 50 + (faceIndex % 15);  // 50-65%浜害
   return `hsl(${Math.round(hue)}, ${saturation}%, ${lightness}%)`;
 }
 
@@ -146,7 +146,7 @@ export class WorkbenchViewer {
     this.selection = null;
     this.state = {
       selectionMode: "part",
-      colorMode: "part", // "face" 或 "part"
+      colorMode: "part", // "face" 锟?"part"
       hiddenNodeIds: new Set(),
       isolatedNodeIds: null,
       section: {
@@ -202,6 +202,7 @@ export class WorkbenchViewer {
     this.grid = new THREE.GridHelper(600, 30, 0xcccccc, 0xe0e0e0);
     this.grid.rotation.x = Math.PI / 2;
     this.grid.position.z = -0.01;
+    this.grid.visible = false;
     this.scene.add(this.grid);
 
     this.axes = new THREE.AxesHelper(150);
@@ -231,12 +232,12 @@ export class WorkbenchViewer {
     this.handleResize();
     this.animationFrame = requestAnimationFrame(() => this.renderLoop());
 
-    // 角落3D轴指示器
+    // 瑙掕惤3D杞存寚绀哄櫒
     this.initOrientationWidget();
   }
 
   initOrientationWidget() {
-    // 创建独立canvas覆盖层
+    // 鍒涘缓鐙珛canvas瑕嗙洊锟?
     this.orientCanvas = document.createElement("canvas");
     this.orientCanvas.style.cssText =
       "position:absolute;bottom:16px;left:16px;width:100px;height:100px;pointer-events:none;z-index:10;";
@@ -249,12 +250,12 @@ export class WorkbenchViewer {
 
     this.orientScene = new THREE.Scene();
 
-    // 正交相机，固定等轴测视角
+    // 姝ｄ氦鐩告満锛屽浐瀹氱瓑杞存祴瑙嗚
     this.orientCamera = new THREE.OrthographicCamera(-30, 30, 30, -30, 0.1, 1000);
     this.orientCamera.position.set(50, 50, 50);
     this.orientCamera.lookAt(0, 0, 0);
 
-    // X轴箭头（红色）
+    // X杞寸澶达紙绾㈣壊锟?
     const xArrow = new THREE.Group();
     xArrow.add(new THREE.Mesh(new THREE.CylinderGeometry(0, 2.5, 10, 8), new THREE.MeshBasicMaterial({ color: 0xe74c3c })));
     const xCone = new THREE.Mesh(new THREE.ConeGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0xe74c3c }));
@@ -263,7 +264,7 @@ export class WorkbenchViewer {
     xArrow.add(xCone);
     this.orientScene.add(xArrow);
 
-    // Y轴箭头（绿色）
+    // Y杞寸澶达紙缁胯壊锟?
     const yArrow = new THREE.Group();
     yArrow.add(new THREE.Mesh(new THREE.CylinderGeometry(0, 2.5, 10, 8), new THREE.MeshBasicMaterial({ color: 0x2ecc71 })));
     const yCone = new THREE.Mesh(new THREE.ConeGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x2ecc71 }));
@@ -271,7 +272,7 @@ export class WorkbenchViewer {
     yArrow.add(yCone);
     this.orientScene.add(yArrow);
 
-    // Z轴箭头（蓝色）
+    // Z杞寸澶达紙钃濊壊锟?
     const zArrow = new THREE.Group();
     zArrow.add(new THREE.Mesh(new THREE.CylinderGeometry(0, 2.5, 10, 8), new THREE.MeshBasicMaterial({ color: 0x3498db })));
     const zCone = new THREE.Mesh(new THREE.ConeGeometry(3, 8, 8), new THREE.MeshBasicMaterial({ color: 0x3498db }));
@@ -372,7 +373,7 @@ export class WorkbenchViewer {
     const currentKey = this.hovered ? `${this.hovered.nodeId}:${this.hovered.faceId || this.hovered.meshId || "part"}` : null;
     if (hoverKey !== currentKey) {
       this.hovered = pick;
-      this.onHintChange(pick ? `悬停：${pick.label}` : "拖拽旋转，滚轮缩放，双击适配");
+      this.onHintChange(pick ? `Hover: ${pick.label}` : "Drag to rotate, scroll to zoom, double-click to fit");
       this.applyVisualState();
     }
   }
@@ -393,7 +394,7 @@ export class WorkbenchViewer {
 
   handleDoubleClick() {
     this.fit();
-    this.onHintChange("视图已适配");
+    this.onHintChange("瑙嗗浘宸查€傞厤");
   }
 
   pick(event) {
@@ -460,23 +461,17 @@ export class WorkbenchViewer {
 
   buildMaterials(meshData, geometry) {
     geometry.clearGroups();
-    const defaultMaterial = createMaterial(hexToColor(meshData.color));
-    const materials = [defaultMaterial];
+    const highlightedFaces = this.state?.highlightedFaces || new Map();
+    const partColor = this.nodeMap.get(meshData.nodeId)?.color || meshData.color || "#8aa6d1";
+    const materials = [createMaterial(hexToColor(partColor))];
 
-    // 如果是零件级着色模式，为每个零件（mesh）分配唯一颜色
-    if (this.state.colorMode === "part") {
-      const partColor = this.nodeMap.get(meshData.nodeId)?.color || meshData.color || "#8aa6d1";
-      console.error("[DEBUG] buildMaterials part mode:", {
-        meshId: meshData.id,
-        nodeId: meshData.nodeId,
-        partColor,
-      });
-      materials[0] = createMaterial(hexToColor(partColor));
+    // 濡傛灉鏄浂浠剁骇鐫€鑹叉ā寮忥紝涓烘瘡涓浂浠讹紙mesh锛夊垎閰嶅敮涓€棰滆壊
+    if (this.state.colorMode === "part" && !meshData.brepFaces?.some((face) => highlightedFaces.has(face.id))) {
       geometry.addGroup(0, meshData.index.length * 3, 0);
       return materials;
     }
 
-    // 面级着色模式：为每个BRep面分配不同颜色
+    // 闈㈢骇鐫€鑹叉ā寮忥細涓烘瘡涓狟Rep闈㈠垎閰嶄笉鍚岄锟?
     if (meshData.brepFaces?.length) {
       const triangleCount = meshData.index.length / 3;
       let triangleIndex = 0;
@@ -491,11 +486,19 @@ export class WorkbenchViewer {
           if (triangleIndex < face.triangleFirst) {
             lastIndex = face.triangleFirst;
           } else {
-            const faceColor = getFaceColor(faceIndex, meshData.brepFaces.length);
-            materials.push(createMaterial(faceColor));
-            materialIndex = materials.length - 1;
+            const highlightColor = highlightedFaces.get(face.id);
+            if (highlightColor) {
+              materials.push(createMaterial(hexToColor(highlightColor, "#ff2b2b")));
+              materialIndex = materials.length - 1;
+            } else if (this.state.colorMode === "part") {
+              materialIndex = 0;
+            } else {
+              const faceColor = getFaceColor(faceIndex, meshData.brepFaces.length);
+              materials.push(createMaterial(faceColor));
+              materialIndex = materials.length - 1;
+              face.renderColor = faceColor;
+            }
             face.materialIndex = materialIndex;
-            face.renderColor = faceColor; // 存储渲染颜色供UI使用
             lastIndex = face.triangleLast + 1;
             faceIndex += 1;
           }
@@ -512,13 +515,13 @@ export class WorkbenchViewer {
   setScene(sceneData, { preserveCamera = false } = {}) {
     this.sceneData = sceneData;
     this.nodeMap = new Map(sceneData.nodes.map((node) => [node.id, node]));
-    // 为零件级着色创建 nodeId -> colorIndex 映射
+    // 涓洪浂浠剁骇鐫€鑹插垱锟?nodeId -> colorIndex 鏄犲皠
     this.partColorIndexMap = new Map();
     let partColorIndex = 0;
     for (const node of sceneData.nodes) {
       this.partColorIndexMap.set(node.id, partColorIndex++);
     }
-    // 同时建立 meshId -> partColorIndex 映射（用于快速查找）
+    // 鍚屾椂寤虹珛 meshId -> partColorIndex 鏄犲皠锛堢敤浜庡揩閫熸煡鎵撅級
     this.meshPartColorIndexMap = new Map();
     console.error("[DEBUG] setScene mesh setup:", { nodeCount: sceneData.nodes.length, meshCount: sceneData.meshes.length });
     sceneData.meshes.forEach((meshData) => {
@@ -600,7 +603,7 @@ export class WorkbenchViewer {
       },
     };
     this.updateSectionPlane();
-    // 如果colorMode改变了，需要重建材质
+    // 濡傛灉colorMode鏀瑰彉浜嗭紝闇€瑕侀噸寤烘潗锟?
     if (partialState.colorMode !== undefined && partialState.colorMode !== prevColorMode) {
       this.rebuildMaterials();
     }
@@ -614,7 +617,7 @@ export class WorkbenchViewer {
       const { mesh, meshData, node, edges } = record;
       const geometry = mesh.geometry;
 
-      // 重建材质
+      // 閲嶅缓鏉愯川
       const materials = this.buildMaterials(meshData, geometry);
       mesh.material = materials.length > 1 ? materials : materials[0];
       record.baseColors = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((material) =>
@@ -627,7 +630,7 @@ export class WorkbenchViewer {
         materialColor: Array.isArray(mesh.material) ? mesh.material[0]?.color?.getHexString() : mesh.material?.color?.getHexString()
       });
 
-      // 重建边的几何
+      // 閲嶅缓杈圭殑鍑犱綍
       edges.geometry.dispose();
       edges.geometry = new THREE.EdgesGeometry(geometry, 30);
       edges.material.dispose();
@@ -665,6 +668,7 @@ export class WorkbenchViewer {
       nextHighlights.set(faceId, color);
     });
     this.state.highlightedFaces = nextHighlights;
+    this.rebuildMaterials();
     this.applyVisualState();
   }
 
@@ -759,7 +763,7 @@ export class WorkbenchViewer {
       const visibleByIsolation =
         !this.state.isolatedNodeIds || this.state.isolatedNodeIds.has(record.meshData.nodeId);
       record.mesh.visible = visibleByHidden && visibleByIsolation;
-      // 剖切启用时隐藏线框，避免被剖切面上的边缘线干扰视觉
+      // 鍓栧垏鍚敤鏃堕殣钘忕嚎妗嗭紝閬垮厤琚墫鍒囬潰涓婄殑杈圭紭绾垮共鎵拌锟?
       record.edges.visible = record.mesh.visible && !this.state.section.enabled;
       record.edges.position.copy(record.mesh.position);
 
@@ -773,7 +777,7 @@ export class WorkbenchViewer {
         opacity = 1 - this.state.transparencyLevels.get(record.meshData.nodeId);
       }
       materials.forEach((material, index) => {
-        // 只在 face 模式下恢复到 baseColors，part 模式保持当前材质颜色
+        // 鍙湪 face 妯″紡涓嬫仮澶嶅埌 baseColors锛宲art 妯″紡淇濇寔褰撳墠鏉愯川棰滆壊
         material.color.copy(record.baseColors[index] || record.baseColors[0]);
         material.emissive = new THREE.Color(0x000000);
         material.opacity = opacity;
@@ -846,23 +850,25 @@ export class WorkbenchViewer {
     this.render();
   }
 
-  // 设置摄像机位置（球坐标）
-  // azimuth: 方位角（度），0=+Y方向，90=+X方向
-  // elevation: 仰角（度），0=水平，90=头顶，-90=脚下
-  // distance: 距离
-  // roll: 绕视线旋转（度）
-  setCameraBySpherical(azimuth, elevation, distance, roll = 0) {
-    const bounds = this.sceneData?.bounds || { center: { x: 0, y: 0, z: 0 }, size: { x: 100, y: 100, z: 100 } };
+  // 璁剧疆鎽勫儚鏈轰綅缃紙鐞冨潗鏍囷級
+  // azimuth: 鏂逛綅瑙掞紙搴︼級锟?=+Y鏂瑰悜锟?0=+X鏂瑰悜
+  // elevation: 浠拌锛堝害锛夛紝0=姘村钩锟?0=澶撮《锟?90=鑴氫笅
+  // distance: 璺濈
+  // roll: 缁曡绾挎棆杞紙搴︼級
+  setCameraBySpherical(azimuth, elevation, distance, roll = 0, targetBBox = null) {
+    const bounds = targetBBox || this.sceneData?.bounds || { center: { x: 0, y: 0, z: 0 }, size: { x: 100, y: 100, z: 100 } };
     const center = new THREE.Vector3(bounds.center.x, bounds.center.y, bounds.center.z);
+    const size = new THREE.Vector3(bounds.size?.x || 100, bounds.size?.y || 100, bounds.size?.z || 100);
+    const fallbackDistance = Math.max(size.length() * 1.25, 120);
 
-    // 转换为弧度
+    // 杞崲涓哄姬锟?
     const azRad = (azimuth * Math.PI) / 180;
     const elRad = (elevation * Math.PI) / 180;
     const rollRad = (roll * Math.PI) / 180;
 
-    // 计算摄像机位置（球坐标转笛卡尔）
-    // 以target为中心
-    const r = distance;
+    // 璁＄畻鎽勫儚鏈轰綅缃紙鐞冨潗鏍囪浆绗涘崱灏旓級
+    // 浠arget涓轰腑锟?
+    const r = Number(distance) || fallbackDistance;
     const x = r * Math.cos(elRad) * Math.sin(azRad);
     const y = -r * Math.cos(elRad) * Math.cos(azRad);
     const z = r * Math.sin(elRad);
@@ -870,8 +876,8 @@ export class WorkbenchViewer {
     this.controls.target.copy(center);
     this.camera.position.set(center.x + x, center.y + y, center.z + z);
 
-    // 设置 roll（绕视线旋转）
-    // roll 为正时向左旋转
+    // 璁剧疆 roll锛堢粫瑙嗙嚎鏃嬭浆锟?
+    // roll 涓烘鏃跺悜宸︽棆锟?
     const upX = Math.sin(rollRad);
     const upY = Math.cos(rollRad);
     const upZ = 0;
@@ -881,7 +887,7 @@ export class WorkbenchViewer {
     this.render();
   }
 
-  // 获取当前摄像机球坐标参数
+  // 鑾峰彇褰撳墠鎽勫儚鏈虹悆鍧愭爣鍙傛暟
   getCurrentSphericalParams() {
     if (!this.sceneData?.bounds) {
       return { azimuth: 45, elevation: 30, distance: 200, roll: 0 };
@@ -892,7 +898,7 @@ export class WorkbenchViewer {
     const size = new THREE.Vector3(bounds.size.x, bounds.size.y, bounds.size.z);
     const radius = Math.max(size.length() * 0.55, 20);
 
-    // 从摄像机位置计算球坐标
+    // 浠庢憚鍍忔満浣嶇疆璁＄畻鐞冨潗锟?
     const pos = this.camera.position.clone().sub(center);
 
     const distance = pos.length();
@@ -900,21 +906,21 @@ export class WorkbenchViewer {
       return { azimuth: 45, elevation: 30, distance: radius * 2.2, roll: 0 };
     }
 
-    // 归一化
+    // 褰掍竴锟?
     const x = pos.x / distance;
     const y = pos.y / distance;
     const z = pos.z / distance;
 
-    // 计算方位角
+    // 璁＄畻鏂逛綅锟?
     let azimuth = (Math.atan2(x, -y) * 180) / Math.PI;
     if (azimuth < 0) azimuth += 360;
 
-    // 计算仰角
+    // 璁＄畻浠拌
     const elevation = (Math.asin(z) * 180) / Math.PI;
 
-    // 计算 roll
-    // 从 camera.up 向量计算绕视线的旋转
-    const roll = 0; // 简化计算
+    // 璁＄畻 roll
+    // 锟?camera.up 鍚戦噺璁＄畻缁曡绾跨殑鏃嬭浆
+    const roll = 0; // 绠€鍖栬锟?
 
     return {
       azimuth: Math.round(azimuth * 10) / 10,
@@ -941,7 +947,7 @@ export class WorkbenchViewer {
     this.render();
   }
 
-  // 捕获多角度快照
+  // 鎹曡幏澶氳搴﹀揩锟?
   async captureAngleSnapshots(angles = ["iso", "front", "left", "top", "right", "back", "bottom"]) {
     const snapshots = [];
     const bounds = this.sceneData?.bounds;
@@ -953,7 +959,7 @@ export class WorkbenchViewer {
     const size = new THREE.Vector3(bounds.size.x, bounds.size.y, bounds.size.z);
     const radius = Math.max(size.length() * 0.55, 20);
 
-    // 保存当前状态
+    // 淇濆瓨褰撳墠鐘讹拷?
     const originalTarget = this.controls.target.clone();
     const originalPosition = this.camera.position.clone();
     const originalUp = this.camera.up.clone();
@@ -972,7 +978,7 @@ export class WorkbenchViewer {
       this.controls.update();
       this.render();
 
-      // 等待一帧确保渲染完成
+      // 绛夊緟涓€甯х‘淇濇覆鏌撳畬锟?
       await new Promise((resolve) => requestAnimationFrame(resolve));
 
       snapshots.push({
@@ -982,7 +988,7 @@ export class WorkbenchViewer {
       });
     }
 
-    // 恢复原始状态
+    // 鎭㈠鍘熷鐘讹拷?
     this.controls.target.copy(originalTarget);
     this.camera.position.copy(originalPosition);
     this.camera.up.copy(originalUp);
@@ -992,11 +998,12 @@ export class WorkbenchViewer {
     return snapshots;
   }
 
-  async capturePartMultiview(partId, { size = 256, angles = PART_MULTIVIEW_ANGLES } = {}) {
+  async capturePartMultiview(partId, { size = 256, angles = PART_MULTIVIEW_ANGLES, isolatePartIds = null, highlights = null } = {}) {
     const targetNode = this.nodeMap.get(partId);
     if (!targetNode) {
       throw new Error(`Part not found: ${partId}`);
     }
+    const isolatedIds = Array.isArray(isolatePartIds) && isolatePartIds.length ? isolatePartIds : [partId];
 
     const saved = {
       width: this.canvas.width,
@@ -1021,16 +1028,17 @@ export class WorkbenchViewer {
       highlightedFaces: new Map(this.state.highlightedFaces),
       explodedView: this.state.explodedView ? { ...this.state.explodedView } : null,
       partTransforms: new Map(this.state.partTransforms),
+      axesVisible: this.axes?.visible ?? true,
     };
 
-    const bounds = this.sceneData?.bounds;
-    const center = bounds
+    const bounds = unionBounds(isolatedIds.map((id) => this.nodeMap.get(id)?.bbox).filter(Boolean)) || targetNode.bbox || this.sceneData?.bounds;
+    const center = bounds?.center
       ? new THREE.Vector3(bounds.center.x, bounds.center.y, bounds.center.z)
       : new THREE.Vector3();
-    const sizeVec = bounds
+    const sizeVec = bounds?.size
       ? new THREE.Vector3(bounds.size.x, bounds.size.y, bounds.size.z)
       : new THREE.Vector3(100, 100, 100);
-    const radius = Math.max(sizeVec.length() * 0.55, 20);
+    const radius = Math.max(sizeVec.length() * 0.75, 8);
     const results = [];
 
     try {
@@ -1045,13 +1053,17 @@ export class WorkbenchViewer {
       this.camera.updateProjectionMatrix();
 
       this.state.hiddenNodeIds = new Set();
-      this.state.isolatedNodeIds = new Set([partId]);
+      this.state.isolatedNodeIds = new Set(isolatedIds);
       this.state.section = { enabled: false, axis: "x", offset: 0 };
       this.state.transparencyLevels = new Map();
       this.state.fadeOthers = null;
-      this.state.highlightedFaces = new Map();
+      this.state.highlightedFaces = normalizeMap(highlights);
       this.state.explodedView = null;
       this.state.partTransforms = new Map();
+      if (this.axes) {
+        this.axes.visible = false;
+      }
+      this.rebuildMaterials();
       this.setSelection({ selectionType: "part", nodeId: partId, label: targetNode.name });
       this.hovered = null;
       this.applyVisualState();
@@ -1069,9 +1081,12 @@ export class WorkbenchViewer {
         this.controls.target.copy(center);
         this.camera.position.copy(center.clone().addScaledVector(direction, radius * 2.2));
         this.camera.up.set(0, 0, 1);
+        this.camera.near = Math.max(radius / 500, 0.01);
+        this.camera.far = Math.max(radius * 50, 5000);
+        this.camera.updateProjectionMatrix();
         this.controls.update();
         this.render();
-        await new Promise((resolve) => requestAnimationFrame(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 20));
         const canvas = this.renderer.domElement;
         results.push({
           name: angle.name,
@@ -1109,19 +1124,23 @@ export class WorkbenchViewer {
       this.state.highlightedFaces = saved.highlightedFaces;
       this.state.explodedView = saved.explodedView;
       this.state.partTransforms = saved.partTransforms;
+      if (this.axes) {
+        this.axes.visible = saved.axesVisible;
+      }
       this.rebuildMaterials();
       this.controls.update();
+      this.handleResize();
       this.render();
     }
   }
 }
 
 const angleLabelMap = {
-  iso: "等轴测",
-  front: "前视",
-  left: "左视",
-  top: "顶视",
-  right: "右视",
-  back: "后视",
-  bottom: "底视",
+  iso: "等轴视图",
+  front: "前视图",
+  left: "左视图",
+  top: "顶视图",
+  right: "右视图",
+  back: "后视图",
+  bottom: "底视图",
 };
